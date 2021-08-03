@@ -1,5 +1,6 @@
 CPP := clang++
-CPPFLAGS := -lSDL2 -Wall -g
+CPPFLAGS := -Wall -g
+LINKERFLAGS := -lSDL2
 
 OBJ_DIR := obj
 _OBJ := GameBoy
@@ -15,7 +16,7 @@ BINARY_NAME := gbemu
 
 # Compile the target
 $(BINARY_NAME): $(OBJ) $(MAIN)
-	$(CPP) $(CPPFLAGS) $^ -o $@
+	$(CPP) $(LINKERFLAGS) $(CPPFLAGS) $^ -o $@
 	clang-format -i -style=file $(MAIN)
 
 # Compile all the object files
