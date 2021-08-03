@@ -65,7 +65,7 @@ private:
     void ld_sp_r16(Register16 r2);
     void push(Register16 reg);
     void pop(Register16 reg);
-    void ld_sp_hl(std::int8_t e8);
+    void ldhl_sp_e(std::int8_t e8);
     void ld_n16_addr_sp(std::uint16_t n16);
     void add_a_r8(Register8 reg);
     void add_a_n8(uint8_t n8);

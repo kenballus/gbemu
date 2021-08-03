@@ -214,7 +214,7 @@ void GameBoy::pop(Register16 reg) {
 }
 
 void GameBoy::ldhl_sp_e(int8_t e8) {
-    sp = get_register(REG_HL) + e;
+    sp = get_register(REG_HL) + e8;
     cycles_to_wait += 3;
 }
 
@@ -295,17 +295,16 @@ void GameBoy::execute_instruction(uint32_t ins32) {
     } else if (op == 0b11 && (ins8 & 0b1111) == 0b0001) {
         pop(r16);
     } else if (ins8 == 0b11111000) {
-        ldhl_sp_e(e);
+        ldhl_sp_e(e8);
     } else if (ins8 == 0b00001000) {
         ld_n16_addr_sp(n16);
-    } else if (op == 0b10 && r8_1 == 0b000) { // Start 8-bit arithmetic and logical operation instructions
+    } else if (op == 0b10 && r8_1 == 0b000) {  // Start 8-bit arithmetic and logical operation instructions
         add_a_r8(r8_2);
     } else if (ins8 == 0b11000110) {
         add_a_n8(n8);
     } else if (ins8 == 0b10000110) {
-        
-    }
-    else {
+
+    } else {
         exit(1);
     }
 }
