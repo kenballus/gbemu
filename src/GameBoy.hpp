@@ -26,7 +26,14 @@ enum Register16 {
     REG_DE = 0b01,
     REG_HL = 0b10,
     REG_SP = 0b11,
-    REG_AF = 0b11, // Depends on the instruction
+    REG_AF = 0b11, // Depending on the instruction, 0b11 can also mean sp
+};
+
+enum Flag {
+    FL_C = 1 << 7,
+    FL_H = 1 << 6,
+    FL_N = 1 << 5,
+    FL_Z = 1 << 4,
 };
 
 class GameBoy {
@@ -39,10 +46,12 @@ private:
     int cycles_to_wait = 0;
 
 private:
+    void wait_for_cycles();
     void write_mem8(std::uint16_t addr, std::uint8_t val);
     void write_mem16(std::uint16_t addr, std::uint16_t val);
     void set_register(Register8 reg, std::uint8_t val);
     void set_register(Register16 reg, std::uint16_t val);
+    void set_flag(Flag flag, bool val);
 
     void ld_r8_r8(Register8 r1, Register8 r2);
     void ld_r8_n8(Register8 reg, std::uint8_t val);
@@ -68,7 +77,7 @@ private:
     void ldhl_sp_e(std::int8_t e8);
     void ld_n16_addr_sp(std::uint16_t n16);
     void add_a_r8(Register8 reg);
-    void add_a_n8(uint8_t n8);
+    void add_a_n8(std::uint8_t n8);
     void add_a_hl_addr();
 
 public:
@@ -76,9 +85,10 @@ public:
     std::uint16_t read_mem16(std::uint16_t address) const;
     std::uint8_t get_register(Register8 reg) const;
     std::uint16_t get_register(Register16 reg) const;
+    bool get_flag(Flag flag) const;
+    bool detect_add_carry(std::uint32_t a, std::uint32_t b, std::uint8_t bit) const;
 
     void execute_instruction(std::uint32_t ins32);
-    void wait_for_cycles();
-    void dump_state();
-    void dump_mem();
+    void dump_state() const;
+    void dump_mem() const;
 };

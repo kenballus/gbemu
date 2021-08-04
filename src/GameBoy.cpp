@@ -11,6 +11,11 @@ using std::uint16_t;
 using std::uint32_t;
 using std::uint8_t;
 
+bool GameBoy::detect_add_carry(uint32_t a, uint32_t b, uint8_t bit) const {
+    // Only works if 0 <= bit <= 31
+    return a & (1 << bit) && !((a + b) & (1 << bit));
+}
+
 uint8_t GameBoy::read_mem8(uint16_t addr) const { return ram[addr]; }
 
 uint16_t GameBoy::read_mem16(uint16_t addr) const {
@@ -27,10 +32,10 @@ void GameBoy::write_mem16(uint16_t addr, uint16_t val) {
     ram[addr + 1] = val >> 8;  // high byte
 }
 
-void GameBoy::set_register(Register8 reg, uint8_t val) { registers[reg] = val; }
+void GameBoy::set_register(Register8 r8, uint8_t val) { registers[r8] = val; }
 
-void GameBoy::set_register(Register16 reg, uint16_t val) {
-    switch (reg) {
+void GameBoy::set_register(Register16 r16, uint16_t val) {
+    switch (r16) {
         case REG_BC:
             set_register(REG_B, val >> 8);
             set_register(REG_C, val);  // Type conversion
@@ -52,10 +57,10 @@ void GameBoy::set_register(Register16 reg, uint16_t val) {
     }
 }
 
-uint8_t GameBoy::get_register(Register8 reg) const { return registers[reg]; }
+uint8_t GameBoy::get_register(Register8 r8) const { return registers[r8]; }
 
-uint16_t GameBoy::get_register(Register16 reg) const {
-    switch (reg) {
+uint16_t GameBoy::get_register(Register16 r16) const {
+    switch (r16) {
         case REG_BC:
             return (get_register(REG_B) << 8) | get_register(REG_C);
         case REG_DE:
@@ -68,36 +73,40 @@ uint16_t GameBoy::get_register(Register16 reg) const {
             exit(1);
     }
 
-    std::cerr << "TRIED TO GET NONEXISTENT REGISTER " << std::hex << reg << std::dec << std::endl;
+    std::cerr << "TRIED TO GET NONEXISTENT REGISTER " << std::hex << r16 << std::dec << std::endl;
     return 0xFFFF;
 }
 
+void GameBoy::set_flag(Flag flag, bool val) { set_register(REG_F, get_register(REG_F) | (flag * val)); }
+
+bool GameBoy::get_flag(Flag flag) const { return get_register(REG_F) & flag; }
+
 // 01rrrRRR
-void GameBoy::ld_r8_r8(Register8 r1, Register8 r2) {
+void GameBoy::ld_r8_r8(Register8 r8_1, Register8 r8_2) {
     // Copy r2 into r1
-    set_register(r1, get_register(r2));
+    set_register(r8_1, get_register(r8_2));
     cycles_to_wait += 1;
 }
 
 // 00rrr110
 // nnnnnnnn
-void GameBoy::ld_r8_n8(Register8 reg, uint8_t val) {
+void GameBoy::ld_r8_n8(Register8 r8, uint8_t val) {
     // Copy val into reg
-    set_register(reg, val);
+    set_register(r8, val);
     cycles_to_wait += 2;
 }
 
 // 01rrr110
-void GameBoy::ld_r8_hl_addr(Register8 reg) {
+void GameBoy::ld_r8_hl_addr(Register8 r8) {
     // Copy [HL] into reg
-    set_register(reg, read_mem8(get_register(REG_HL)));
+    set_register(r8, read_mem8(get_register(REG_HL)));
     cycles_to_wait += 2;
 }
 
 // 01110rrr
-void GameBoy::ld_hl_addr_r8(Register8 reg) {
+void GameBoy::ld_hl_addr_r8(Register8 r8) {
     // Copy reg into [HL]
-    write_mem8(get_register(REG_HL), get_register(reg));
+    write_mem8(get_register(REG_HL), get_register(r8));
     cycles_to_wait += 2;
 }
 
@@ -110,22 +119,22 @@ void GameBoy::ld_hl_addr_n8(uint8_t val) {
 }
 
 // 00rr1010, rr = 00|01 (BC or DE)
-void GameBoy::ld_a_r16_addr(Register16 reg) {
-    // Copy [reg] into A
-    set_register(REG_A, read_mem8(get_register(reg)));
+void GameBoy::ld_a_r16_addr(Register16 r16) {
+    // Copy [r16] into A
+    set_register(REG_A, read_mem8(get_register(r16)));
     cycles_to_wait += 2;
 }
 
 // 11110010 (for C)
-void GameBoy::ld_a_ffr8_addr(Register8 reg) {
+void GameBoy::ld_a_ffr8_addr(Register8 r8) {
     // Copy [FFreg] into A
-    set_register(REG_A, read_mem8(0xFF00 + get_register(reg)));
+    set_register(REG_A, read_mem8(0xFF00 + get_register(r8)));
     cycles_to_wait += 2;
 }
 
-void GameBoy::ld_ffr8_addr_a(Register8 reg) {
+void GameBoy::ld_ffr8_addr_a(Register8 r8) {
     // Copy A into [FFreg]
-    write_mem8(0xFF00 + get_register(reg), get_register(REG_A));
+    write_mem8(0xFF00 + get_register(r8), get_register(REG_A));
     cycles_to_wait += 2;
 }
 
@@ -167,9 +176,9 @@ void GameBoy::ld_a_hld_addr() {
     cycles_to_wait += 2;
 }
 
-void GameBoy::ld_r16_addr_a(Register16 reg) {
-    // Copy A into [reg]
-    write_mem8(get_register(reg), get_register(REG_A));
+void GameBoy::ld_r16_addr_a(Register16 r16) {
+    // Copy A into [r16]
+    write_mem8(get_register(r16), get_register(REG_A));
     cycles_to_wait += 2;
 }
 
@@ -187,44 +196,55 @@ void GameBoy::ld_hld_addr_a() {
     cycles_to_wait += 2;
 }
 
-void GameBoy::ld_r16_n16(Register16 reg, uint16_t n16) {
-    if (reg == REG_SP) {
+void GameBoy::ld_r16_n16(Register16 r16, uint16_t n16) {
+    if (r16 == REG_SP) {
         sp = n16;
     } else {
-        set_register(reg, n16);
+        set_register(r16, n16);
     }
     cycles_to_wait += 3;
 }
 
-void GameBoy::ld_sp_r16(Register16 reg) {
-    sp = get_register(reg);
+void GameBoy::ld_sp_r16(Register16 r16) {
+    sp = get_register(r16);
     cycles_to_wait += 4;
 }
 
-void GameBoy::push(Register16 reg) {
+void GameBoy::push(Register16 r16) {
     sp -= 2;
-    write_mem16(sp, get_register(reg));
+    write_mem16(sp, get_register(r16));
     cycles_to_wait += 4;
 }
 
-void GameBoy::pop(Register16 reg) {
-    set_register(reg, read_mem16(sp));
+void GameBoy::pop(Register16 r16) {
+    set_register(r16, read_mem16(sp));
     sp += 2;
     cycles_to_wait += 3;
 }
 
 void GameBoy::ldhl_sp_e(int8_t e8) {
-    sp = get_register(REG_HL) + e8;
+    // This instruction sets FL_C if there was a carry from bit 15,
+    // and sets FL_H if there was a carry from bit 11.
+    // It doesn't set any flags for borrows, even though that can happen.
+    set_flag(FL_Z, false);
+    set_flag(FL_N, false);
+    set_flag(FL_C, detect_add_carry(sp, e8, 15));
+    set_flag(FL_H, detect_add_carry(sp, e8, 11));
+    set_register(REG_HL, sp + e8);
     cycles_to_wait += 3;
 }
 
 void GameBoy::ld_n16_addr_sp(uint16_t n16) {
     write_mem16(n16, sp);
-    cycles_to_wait += 1;
+    cycles_to_wait += 5;
 }
 
-void GameBoy::add_a_r8(Register8 reg) {
-    set_register(REG_A, get_register(REG_A) + get_register(reg));
+void GameBoy::add_a_r8(Register8 r8) {
+    set_flag(FL_N, false);
+    set_flag(FL_Z, get_register(REG_A) == 0);
+    set_flag(FL_H, detect_add_carry(get_register(REG_A), get_register(r8), 3));
+    set_flag(FL_C, detect_add_carry(get_register(REG_A), get_register(r8), 7));
+    set_register(REG_A, get_register(REG_A) + get_register(r8));
     cycles_to_wait += 1;
 }
 
@@ -234,7 +254,7 @@ void GameBoy::add_a_n8(uint8_t n8) {
 }
 void GameBoy::add_a_hl_addr() {
     set_register(REG_A, get_register(REG_A) + read_mem8(get_register(REG_HL)));
-    cycles_to_wait += 5;
+    cycles_to_wait += 2;
 }
 
 void GameBoy::execute_instruction(uint32_t ins32) {
@@ -245,8 +265,8 @@ void GameBoy::execute_instruction(uint32_t ins32) {
     Register16 r16 = (Register16)(ins8 >> 4 & 0b11);
     uint16_t ins16 = ins32 >> 16;
     uint8_t n8 = ins16;  // Type conversion
-    int8_t e8 = *reinterpret_cast<int8_t*>(&n8);
-    uint16_t n16 = ins32 >> 8;  // Type conversion
+    int8_t e8 = n8;      // Type conversion
+    uint16_t n16 = n8;   // Type conversion (not big-endian compatible)
 
     if (op == 0b00 && r8_1 != DUMMY && r8_2 == DUMMY) {  // Start 8-bit transfer+IO
         ld_r8_n8(r8_1, n8);
@@ -303,10 +323,12 @@ void GameBoy::execute_instruction(uint32_t ins32) {
     } else if (ins8 == 0b11000110) {
         add_a_n8(n8);
     } else if (ins8 == 0b10000110) {
-
+        add_a_hl_addr();
     } else {
         exit(1);
     }
+
+    wait_for_cycles();
 }
 
 void GameBoy::wait_for_cycles() {
@@ -314,20 +336,22 @@ void GameBoy::wait_for_cycles() {
     cycles_to_wait = 0;
 }
 
-void GameBoy::dump_state() {
-    std::cout << "A:  " << std::hex << (int)registers[REG_A] << ",\t";
-    std::cout << "B:  " << std::hex << (int)registers[REG_B] << ",\t";
-    std::cout << "C:  " << std::hex << (int)registers[REG_C] << ",\t";
-    std::cout << "D:  " << std::hex << (int)registers[REG_D] << ",\t";
-    std::cout << "E:  " << std::hex << (int)registers[REG_E] << ",\t";
-    std::cout << "F:  " << std::hex << (int)registers[REG_F] << ",\t";
-    std::cout << "H:  " << std::hex << (int)registers[REG_H] << ",\t";
-    std::cout << "L:  " << std::hex << (int)registers[REG_L] << ",\t";
-    std::cout << "SP: " << std::hex << (int)sp << std::dec << ",\t";
-    std::cout << "PC: " << std::hex << (int)pc << std::dec << "\n";
+void GameBoy::dump_state() const {
+    std::cout << std::setfill('0') << std::uppercase << std::hex;
+    std::cout << "AF: " << std::setw(4) << get_register(REG_AF) << std::setw(0) << ",  ";
+    std::cout << "BC: " << std::setw(4) << get_register(REG_BC) << std::setw(0) << ",  ";
+    std::cout << "DE: " << std::setw(4) << get_register(REG_DE) << std::setw(0) << ",  ";
+    std::cout << "HL: " << std::setw(4) << get_register(REG_HL) << std::setw(0) << ",  ";
+    std::cout << "SP: " << std::setw(4) << sp << std::setw(0) << ",  ";
+    std::cout << "PC: " << std::setw(4) << pc << std::setw(0) << "  \n";
+    std::cout << "C:  " << get_flag(FL_C) << ",     ";
+    std::cout << "H:  " << get_flag(FL_H) << ",     ";
+    std::cout << "N:  " << get_flag(FL_N) << ",     ";
+    std::cout << "Z:  " << get_flag(FL_Z) << "\n";
+    std::cout << std::dec;
 }
 
-void GameBoy::dump_mem() {
+void GameBoy::dump_mem() const {
     std::string prev_line = "";
     std::string line = "";
     bool starring = false;
