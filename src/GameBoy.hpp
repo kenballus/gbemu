@@ -79,6 +79,14 @@ private:
     void add_a_r8(Register8 reg);
     void add_a_n8(std::uint8_t n8);
     void add_a_hl_addr();
+    
+    void DAA();
+    void CPL();
+    void NOP();
+    void CCF();
+    void SCF();
+    void DI();
+    void EI();
 
 public:
     std::uint8_t read_mem8(std::uint16_t address) const;
