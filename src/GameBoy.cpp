@@ -380,3 +380,68 @@ void GameBoy::dump_mem() const {
     }
     std::cout << TOTAL_RAM << std::endl << std::dec << std::setw(0);
 }
+
+// Binary Decimal adjustment (use after addition or subtraction)
+// void GameBoy::DAA() {
+//     // init
+//     bool c_contents = get_flag(FL_C);
+//     bool h_contents = get_flag(FL_H);
+//     uint8_t a_contents = get_register(REG_A);
+
+//     if (get_flag(FL_N)) { // subtraction
+//         if (c_contents){
+//             if (h_contents){
+//                 if(0x66 <= a_contents && a_contents <= 0xFF){
+//                     set_register(REG_A, a_contents + 0x9A);
+//                 }
+//             } else {
+//                 if(0x07 <= a_contents && a_contents <= 0x9F){
+//                     set_register(REG_A, a_contents + 0xA0);
+//                 }
+//             }
+//         } else {
+//             if (h_contents){
+
+//             }
+//         }
+//     } else { // addition
+
+//     }
+// }
+
+
+
+// Set register A's contents to the complement of its contents
+void GameBoy::CPL() {
+    set_register(REG_A, get_register(REG_A)^1);
+    cycles_to_wait += 1;
+}
+
+// No op, wait 1 cycle
+void GameBoy::NOP() {
+    cycles_to_wait += 1;
+}
+
+// Flip carry flag value
+void GameBoy::CCF() {
+    set_flag(FL_C, !get_flag(FL_C));
+    cycles_to_wait += 1;
+}
+
+// Set Carry to 1
+void GameBoy::SCF() {
+    set_flag(FL_C, true);
+    cycles_to_wait += 1;
+}
+
+// Set EI to 0
+void GameBoy::DI() {
+    write_mem8(0xFFFF, 0);
+    cycles_to_wait += 1;
+}
+
+// Set EI to 1
+void GameBoy::EI() {
+    write_mem8(0xFFFF, 1);
+    cycles_to_wait += 1;
+}
