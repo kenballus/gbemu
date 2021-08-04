@@ -257,6 +257,11 @@ void GameBoy::add_a_hl_addr() {
     cycles_to_wait += 2;
 }
 
+void GameBoy::adc_a_r8(Register8 r8) {
+    
+    cycles_to_wait += 1;
+}
+
 void GameBoy::execute_instruction(uint32_t ins32) {
     uint8_t ins8 = ins32 >> 24;
     uint8_t op = ins8 >> 6;

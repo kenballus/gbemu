@@ -113,6 +113,7 @@ int main(int argc, char* argv[]) {
     //         }
     //     }
     // }
+
     deinit(window, renderer, gb_screen);
     return 0;
 }

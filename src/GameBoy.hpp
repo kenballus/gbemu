@@ -52,6 +52,7 @@ private:
     void set_register(Register8 reg, std::uint8_t val);
     void set_register(Register16 reg, std::uint16_t val);
     void set_flag(Flag flag, bool val);
+    bool detect_add_carry(std::uint32_t a, std::uint32_t b, std::uint8_t bit) const;
 
     void ld_r8_r8(Register8 r1, Register8 r2);
     void ld_r8_n8(Register8 reg, std::uint8_t val);
@@ -86,7 +87,6 @@ public:
     std::uint8_t get_register(Register8 reg) const;
     std::uint16_t get_register(Register16 reg) const;
     bool get_flag(Flag flag) const;
-    bool detect_add_carry(std::uint32_t a, std::uint32_t b, std::uint8_t bit) const;
 
     void execute_instruction(std::uint32_t ins32);
     void dump_state() const;
