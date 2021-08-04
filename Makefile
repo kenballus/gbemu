@@ -1,5 +1,5 @@
 CPP := clang++
-CPPFLAGS := -Wall -g
+CPPFLAGS := -Wall -g -march=native
 LINKERFLAGS := -lSDL2
 
 OBJ_DIR := obj
