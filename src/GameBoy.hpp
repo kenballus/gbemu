@@ -8,6 +8,7 @@
 #define NUM_REGISTERS 8
 #define TOTAL_RAM 0xFFFF
 #define ENTRY_OFFSET 0x100
+#define IME_OFFSET 0xFFFF
 
 enum Register8 {
     REG_B = 0b000,
@@ -37,7 +38,7 @@ enum Flag {
 };
 
 class GameBoy {
-private:
+public: // change to private when done debugging
     std::uint16_t sp = 0;
     std::uint16_t pc = ENTRY_OFFSET;
     std::uint8_t ram[TOTAL_RAM] = {0};
@@ -45,14 +46,15 @@ private:
 
     int cycles_to_wait = 0;
 
-private:
+public: // change to private when done debugging
     void wait_for_cycles();
     void write_mem8(std::uint16_t addr, std::uint8_t val);
     void write_mem16(std::uint16_t addr, std::uint16_t val);
     void set_register(Register8 reg, std::uint8_t val);
     void set_register(Register16 reg, std::uint16_t val);
     void set_flag(Flag flag, bool val);
-    bool detect_add_carry(std::uint32_t a, std::uint32_t b, std::uint8_t bit) const;
+    bool detect_carry(std::uint32_t a, std::uint32_t b, std::uint8_t bit) const;
+    bool detect_borrow(std::uint32_t a, std::uint32_t b, std::uint8_t bit) const;
 
     void ld_r8_r8(Register8 r1, Register8 r2);
     void ld_r8_n8(Register8 reg, std::uint8_t val);
@@ -80,7 +82,29 @@ private:
     void add_a_r8(Register8 reg);
     void add_a_n8(std::uint8_t n8);
     void add_a_hl_addr();
-    
+    void adc_a_r8(Register8 r8);
+    void adc_a_n8(std::uint8_t n8);
+    void adc_a_hl_addr();
+    void sub_r8(Register8 r8);
+    void sub_n8(std::uint8_t n8);
+    void sub_hl_addr();
+    void sbc_a_r8(Register8 r8);
+    void sbc_a_n8(std::uint8_t n8);
+    void sbc_a_hl_addr();
+    void and_r8(Register8 r8);
+    void and_n8(std::uint8_t n8);
+    void and_hl_addr();
+    void or_r8(Register8 r8);
+    void or_n8(std::uint8_t n8);
+    void or_hl_addr();
+    void xor_r8(Register8 r8);
+    void xor_n8(std::uint8_t n8);
+    void xor_hl_addr();
+    void cp_r8(Register8 r8);
+    void cp_n8(std::uint8_t n8);
+    void cp_hl_addr();
+
+
     void DAA();
     void CPL();
     void NOP();
