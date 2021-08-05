@@ -619,32 +619,86 @@ void GameBoy::dump_mem() const {
 }
 
 // Binary Decimal adjustment (use after addition or subtraction)
-// void GameBoy::daa() {
-//     // init
-//     bool c_contents = get_flag(FL_C);
-//     bool h_contents = get_flag(FL_H);
-//     uint8_t a_contents = get_register(REG_A);
+void GameBoy::DAA() {
+    // init
+    bool c_contents = get_flag(FL_C);
+    bool h_contents = get_flag(FL_H);
+    bool n_contents = get_flag(FL_N);
+    uint8_t a_contents = get_register(REG_A);
 
-//     if (get_flag(FL_N)) { // subtraction
-//         if (c_contents){
-//             if (h_contents){
-//                 if(0x66 <= a_contents && a_contents <= 0xFF){
-//                     set_register(REG_A, a_contents + 0x9A);
-//                 }
-//             } else {
-//                 if(0x07 <= a_contents && a_contents <= 0x9F){
-//                     set_register(REG_A, a_contents + 0xA0);
-//                 }
-//             }
-//         } else {
-//             if (h_contents){
+    cycles_to_wait += 1;
 
-//             }
-//         }
-//     } else { // addition
+    if (n_contents) { // subtraction
+        if (c_contents){
+            if (h_contents){
+                if(0x66 <= a_contents && a_contents <= 0xFF){
+                    set_register(REG_A, a_contents + 0x9A);
+                    return;
+                }
+            } else {
+                if(0x07 <= a_contents && a_contents <= 0x9F){
+                    set_register(REG_A, a_contents + 0xA0);
+                    return;
+                }
+            }
+        } else {
+            if (h_contents){
+                if(0x60 <= a_contents && a_contents <= 0xF8){
+                    set_register(REG_A, a_contents + 0xFA);
+                    return;
+                }
+            } else {
+                if(0x00 <= a_contents && a_contents <= 0x99){
+                    return;                
+                    }
+            }
+    } else { // addition - some of these cases change flag C
+        if (c_contents){
+            if(h_contents){
+                if(0x00 <= a_contents && a_contents <= 0x33){
+                    set_register(REG_A, a_contents + 0x66);
+                    return;
+            }else{
+                if(0xA0 <= a_contents && a_contents <= 0xF2){
+                    set_register(REG_A, a_contents + 0x66);
+                    return;
+            } else if(0x00 <= a_contents && a_contents <= 0x92){
+                    set_register(REG_A, a_contents + 0x60);
+                    return;
+                }
+        }else{
+            if(h_contents){
+                if(0x0A <= a_contents && a_contents <= 0x3F){
+                    set_register(REG_A, a_contents + 0x66);
+                    set_flag(FL_C, true);
+                    return;
+            } else if(0x00 <= a_contents && a_contents <= 0x39){
+                    set_register(REG_A, a_contents + 0x06);
+                    return;
+                }
+            }else{
+                if(0xA9 <= a_contents && a_contents <= 0xFF){
+                    set_register(REG_A, a_contents + 0x66);
+                    set_flag(FL_C, true);
+                    return;
+            } else if(0x0A <= a_contents && a_contents <= 0x9F){
+                    set_register(REG_A, a_contents + 0x60);
+                    set_flag(FL_C, true);
+                    return;
+            } else if(0xA0 <= a_contents && a_contents <= 0xF8){
+                    set_register(REG_A, a_contents + 0x06);
+                    return;
+            } else if(0x00 <= a_contents && a_contents <= 0x99){
+                    return;
+            }
+        }
 
-//     }
-// }
+    }
+    // Invalid state
+    std::cerr << "INVALID STATE: FLAG N:" << n_contents << "\nFLAG C: " << c_contents 
+    << "\nFLAG H: " << h_contents << "\nREG A: " << a_contents << std::endl;
+}
+>>>>>>> 240365177904577e7c0cfc6df598e214f0ea6acd
 
 
 // Set register A's contents to the complement of its contents
