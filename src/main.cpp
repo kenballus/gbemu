@@ -88,6 +88,19 @@ void update_gb_screen(GameBoy const& gb, SDL_Texture* gb_screen, SDL_Renderer* r
     SDL_UpdateWindowSurface(window);
 }
 
+void test(GameBoy& gb) {
+    // gb.execute_instruction(0b0000111011111111 << 16);  // ld C, FFh
+    // gb.execute_instruction(0b0011111011111111 << 16);  // ld A, FFh
+    // gb.execute_instruction(0b00000010 << 24);          // ld (BC), A
+    gb.set_register(REG_A, 0x70);
+    gb.set_flag(FL_C, true);
+    gb.set_flag(FL_H, false);
+    gb.set_flag(FL_N, true);
+    gb.daa();
+    gb.dump_mem();
+    gb.dump_state();
+}
+
 int main(int argc, char* argv[]) {
     SDL_Window* window = NULL;
     SDL_Renderer* renderer = NULL;
@@ -98,11 +111,7 @@ int main(int argc, char* argv[]) {
     bool quit = false;
     SDL_Event event;
     auto gb = GameBoy();
-    gb.execute_instruction(0b0000111011111111 << 16);  // ld C, FFh
-    gb.execute_instruction(0b0011111011111111 << 16);  // ld A, FFh
-    gb.execute_instruction(0b00000010 << 24);          // ld (BC), A
-    gb.dump_mem();
-    gb.dump_state();
+    test(gb);
 
     // update_gb_screen(gb, gb_screen, renderer, window);
     // while (!quit) {

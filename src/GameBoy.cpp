@@ -475,11 +475,22 @@ void GameBoy::xor_hl_addr() {
     cycles_to_wait += 2;
 }
 
-void GameBoy::cp_r8(Register8 r8) {}
+void GameBoy::cp_r8(Register8 r8) {
+    set_flag(FL_N, true);
+    cycles_to_wait += 1;
+}
 
-void GameBoy::cp_n8(uint8_t n8) {}
+void GameBoy::cp_n8(uint8_t n8) {
+    uint8_t a_val = get_register(REG_A);
+    set_flag(FL_N, true);
+    set_flag(FL_Z, a_val == n8);
+    cycles_to_wait += 2;
+}
 
-void GameBoy::cp_hl_addr() {}
+void GameBoy::cp_hl_addr() {
+    set_flag(FL_N, true);
+    cycles_to_wait += 2;
+}
 
 void GameBoy::execute_instruction(uint32_t ins32) {
     uint8_t ins8 = ins32 >> 24;
@@ -530,13 +541,13 @@ void GameBoy::execute_instruction(uint32_t ins32) {
         ld_hli_addr_a();
     } else if (ins8 == 0b00110010) {
         ld_hld_addr_a();
-    } else if (op == 0b00 && (ins8 & 0b1111) == 0b0001) {  // Start 16-bit transfers
+    } else if ((ins8 & 0b11001111) == 0b00000001) {  // Start 16-bit transfers
         ld_r16_n16(r16, n16);
     } else if (ins8 == 0b11111001) {
         ld_sp_r16(REG_HL);
-    } else if (op == 0b11 && (ins8 & 0b1111) == 0b0101) {
+    } else if ((ins8 & 0b11001111) == 0b11000101) {
         push(r16);
-    } else if (op == 0b11 && (ins8 & 0b1111) == 0b0001) {
+    } else if ((ins8 & 0b11001111) == 0b11000001) {
         pop(r16);
     } else if (ins8 == 0b11111000) {
         ldhl_sp_e(e8);
@@ -566,6 +577,30 @@ void GameBoy::execute_instruction(uint32_t ins32) {
         sbc_a_n8(n8);
     } else if (ins8 == 0b10011110) {
         sbc_a_hl_addr();
+    } else if ((ins8 & 0b11111000) == 0b10100000 && r8_2 != DUMMY) {
+        and_r8(r8_2);
+    } else if (ins8 == 0b11100110) {
+        and_n8(n8);
+    } else if (ins8 == 0b10100110) {
+        and_hl_addr();
+    } else if ((ins8 & 0b11111000) == 0b10110000) {
+        or_r8(r8_2);
+    } else if (ins8 == 0b11110110) {
+        or_n8(n8);
+    } else if (ins8 == 0b10110110) {
+        or_hl_addr();
+    } else if ((ins8 & 0b11111000) == 0b10101000) {
+        xor_r8(r8_2);
+    } else if (ins8 == 0b11101110) {
+        xor_n8(n8);
+    } else if (ins8 == 0b10101110) {
+        xor_hl_addr();
+    } else if ((ins8 & 0b11111000) == 0b10111000) {
+        cp_r8(r8_2);
+    } else if (ins8 == 0b11111110) {
+        cp_n8(n8);
+    } else if (ins8 == 0b10111110) {
+        cp_hl_addr();
     } else {
         exit(1);
     }
@@ -580,10 +615,10 @@ void GameBoy::wait_for_cycles() {
 
 void GameBoy::dump_state() const {
     std::cout << std::setfill('0') << std::uppercase << std::hex;
-    std::cout << "AF: " << std::setw(4) << get_register(REG_AF) << std::setw(0) << ",  ";
-    std::cout << "BC: " << std::setw(4) << get_register(REG_BC) << std::setw(0) << ",  ";
-    std::cout << "DE: " << std::setw(4) << get_register(REG_DE) << std::setw(0) << ",  ";
-    std::cout << "HL: " << std::setw(4) << get_register(REG_HL) << std::setw(0) << ",  ";
+    std::cout << "AF: " << std::setw(4) << (int)get_register(REG_AF) << std::setw(0) << ",  ";
+    std::cout << "BC: " << std::setw(4) << (int)get_register(REG_BC) << std::setw(0) << ",  ";
+    std::cout << "DE: " << std::setw(4) << (int)get_register(REG_DE) << std::setw(0) << ",  ";
+    std::cout << "HL: " << std::setw(4) << (int)get_register(REG_HL) << std::setw(0) << ",  ";
     std::cout << "SP: " << std::setw(4) << sp << std::setw(0) << ",  ";
     std::cout << "PC: " << std::setw(4) << pc << std::setw(0) << "  \n";
     std::cout << "C:  " << get_flag(FL_C) << ",     ";
@@ -618,6 +653,67 @@ void GameBoy::dump_mem() const {
     std::cout << TOTAL_RAM << std::endl << std::dec << std::setw(0);
 }
 
+void GameBoy::daa() {
+    bool const c_contents = get_flag(FL_C);
+    bool const h_contents = get_flag(FL_H);
+    bool const n_contents = get_flag(FL_N);
+    uint8_t const a_contents = get_register(REG_A);
+    uint8_t const a_hi = a_contents >> 4;
+    uint8_t const a_lo = a_contents % (1 << 4);
+
+    int addend = -1;
+    bool carry{};
+    if (n_contents) {  // subtraction. The invalid states are not detected for subtraction.
+        if (!c_contents && !h_contents) {
+            addend = 0x00;
+            carry = false;
+        } else if (!c_contents && h_contents) {
+            addend = 0xFA;
+            carry = false;
+        } else if (c_contents && !h_contents) {
+            addend = 0xA0;
+            carry = true;
+        } else {
+            addend = 0x9A;
+            carry = true;
+        }
+    } else {  // addition
+        if (!c_contents && !h_contents && a_hi <= 0x9 && a_lo <= 0x9) {
+            addend = 0x00;
+            carry = false;
+        } else if (!c_contents && !h_contents && a_hi <= 0x8 && a_lo >= 0xA) {
+            addend = 0x06;
+            carry = false;
+        } else if (!c_contents && h_contents && a_hi <= 0x9 && a_lo <= 0x3) {
+            addend = 0x06;
+            carry = false;
+        } else if (!c_contents && !h_contents && a_hi >= 0xA && a_lo <= 0x9) {
+            addend = 0x60;
+            carry = true;
+        } else if (!c_contents && !h_contents && a_hi >= 0x9 && a_lo >= 0xA) {
+            addend = 0x66;
+            carry = true;
+        } else if (!c_contents && h_contents && a_hi >= 0xA && a_lo <= 0x3) {
+            addend = 0x66;
+            carry = true;
+        } else if (c_contents && !h_contents && a_hi <= 0x2 && a_lo <= 0x9) {
+            addend = 0x60;
+            carry = true;
+        } else if (c_contents && !h_contents && a_hi <= 0x2 && a_lo >= 0xA) {
+            addend = 0x66;
+            carry = true;
+        } else if (c_contents && h_contents && a_hi <= 0x3 && a_lo <= 0x3) {
+            addend = 0x66;
+            carry = true;
+        } else {
+            std::cerr << "INVALID STATE:" << std::endl;
+            dump_state();
+        }
+    }
+    set_flag(FL_C, carry);
+    set_register(REG_A, a_contents + addend);
+}
+
 // Binary Decimal adjustment (use after addition or subtraction)
 void GameBoy::DAA() {
     // init
@@ -628,77 +724,75 @@ void GameBoy::DAA() {
 
     cycles_to_wait += 1;
 
-    if (n_contents) { // subtraction
-        if (c_contents){
-            if (h_contents){
-                if(0x66 <= a_contents && a_contents <= 0xFF){
+    if (n_contents) {  // subtraction
+        if (c_contents) {
+            if (h_contents) {
+                if (0x66 <= a_contents && a_contents <= 0xFF) {
                     set_register(REG_A, a_contents + 0x9A);
                     return;
                 }
             } else {
-                if(0x07 <= a_contents && a_contents <= 0x9F){
+                if (0x07 <= a_contents && a_contents <= 0x9F) {
                     set_register(REG_A, a_contents + 0xA0);
                     return;
                 }
             }
         } else {
-            if (h_contents){
-                if(0x60 <= a_contents && a_contents <= 0xF8){
+            if (h_contents) {
+                if (0x60 <= a_contents && a_contents <= 0xF8) {
                     set_register(REG_A, a_contents + 0xFA);
                     return;
                 }
             } else {
-                if(0x00 <= a_contents && a_contents <= 0x99){
-                    return;                
-                    }
-            }
-    } else { // addition - some of these cases change flag C
-        if (c_contents){
-            if(h_contents){
-                if(0x00 <= a_contents && a_contents <= 0x33){
-                    set_register(REG_A, a_contents + 0x66);
-                    return;
-            }else{
-                if(0xA0 <= a_contents && a_contents <= 0xF2){
-                    set_register(REG_A, a_contents + 0x66);
-                    return;
-            } else if(0x00 <= a_contents && a_contents <= 0x92){
-                    set_register(REG_A, a_contents + 0x60);
+                if (0x00 <= a_contents && a_contents <= 0x99) {
                     return;
                 }
-        }else{
-            if(h_contents){
-                if(0x0A <= a_contents && a_contents <= 0x3F){
-                    set_register(REG_A, a_contents + 0x66);
-                    set_flag(FL_C, true);
-                    return;
-            } else if(0x00 <= a_contents && a_contents <= 0x39){
-                    set_register(REG_A, a_contents + 0x06);
-                    return;
-                }
-            }else{
-                if(0xA9 <= a_contents && a_contents <= 0xFF){
-                    set_register(REG_A, a_contents + 0x66);
-                    set_flag(FL_C, true);
-                    return;
-            } else if(0x0A <= a_contents && a_contents <= 0x9F){
-                    set_register(REG_A, a_contents + 0x60);
-                    set_flag(FL_C, true);
-                    return;
-            } else if(0xA0 <= a_contents && a_contents <= 0xF8){
-                    set_register(REG_A, a_contents + 0x06);
-                    return;
-            } else if(0x00 <= a_contents && a_contents <= 0x99){
-                    return;
             }
         }
-
+    } else {  // addition - some of these cases change flag C
+        if (c_contents) {
+            if (h_contents) {
+                if (0x00 <= a_contents && a_contents <= 0x33) {
+                    set_register(REG_A, a_contents + 0x66);
+                    return;
+                }
+            } else if (0xA0 <= a_contents && a_contents <= 0xF2) {
+                set_register(REG_A, a_contents + 0x66);
+                return;
+            } else if (0x00 <= a_contents && a_contents <= 0x92) {
+                set_register(REG_A, a_contents + 0x60);
+                return;
+            }
+        } else {
+            if (h_contents) {
+                if (0x0A <= a_contents && a_contents <= 0x3F) {
+                    set_register(REG_A, a_contents + 0x66);
+                    set_flag(FL_C, true);
+                    return;
+                }
+            } else if (0x00 <= a_contents && a_contents <= 0x39) {
+                set_register(REG_A, a_contents + 0x06);
+                return;
+            } else if (0xA9 <= a_contents && a_contents <= 0xFF) {
+                set_register(REG_A, a_contents + 0x66);
+                set_flag(FL_C, true);
+                return;
+            } else if (0x0A <= a_contents && a_contents <= 0x9F) {
+                set_register(REG_A, a_contents + 0x60);
+                set_flag(FL_C, true);
+                return;
+            } else if (0xA0 <= a_contents && a_contents <= 0xF8) {
+                set_register(REG_A, a_contents + 0x06);
+                return;
+            } else if (0x00 <= a_contents && a_contents <= 0x99) {
+                return;
+            }
+        }
     }
     // Invalid state
-    std::cerr << "INVALID STATE: FLAG N:" << n_contents << "\nFLAG C: " << c_contents 
-    << "\nFLAG H: " << h_contents << "\nREG A: " << a_contents << std::endl;
+    std::cerr << "INVALID STATE: FLAG N:" << n_contents << "\nFLAG C: " << c_contents << "\nFLAG H: " << h_contents
+              << "\nREG A: " << a_contents << std::endl;
 }
->>>>>>> 240365177904577e7c0cfc6df598e214f0ea6acd
 
 
 // Set register A's contents to the complement of its contents

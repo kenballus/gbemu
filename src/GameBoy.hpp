@@ -103,7 +103,7 @@ public: // change to private when done debugging
     void cp_r8(Register8 r8);
     void cp_n8(std::uint8_t n8);
     void cp_hl_addr();
-
+    void daa();
 
     void DAA();
     void CPL();
