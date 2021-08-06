@@ -92,11 +92,11 @@ void test(GameBoy& gb) {
     // gb.execute_instruction(0b0000111011111111 << 16);  // ld C, FFh
     // gb.execute_instruction(0b0011111011111111 << 16);  // ld A, FFh
     // gb.execute_instruction(0b00000010 << 24);          // ld (BC), A
-    gb.set_register(REG_A, 0x70);
+    gb.set_register(REG_A, 0x3B);
+    gb.set_register(REG_H, 0x2A);
+    gb.write_mem8(gb.get_register(REG_HL), 0x4F);
     gb.set_flag(FL_C, true);
-    gb.set_flag(FL_H, false);
-    gb.set_flag(FL_N, true);
-    gb.daa();
+    gb.sbc_hl_addr();
     gb.dump_mem();
     gb.dump_state();
 }

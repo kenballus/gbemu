@@ -88,9 +88,9 @@ public: // change to private when done debugging
     void sub_r8(Register8 r8);
     void sub_n8(std::uint8_t n8);
     void sub_hl_addr();
-    void sbc_a_r8(Register8 r8);
-    void sbc_a_n8(std::uint8_t n8);
-    void sbc_a_hl_addr();
+    void sbc_r8(Register8 r8);
+    void sbc_n8(std::uint8_t n8);
+    void sbc_hl_addr();
     void and_r8(Register8 r8);
     void and_n8(std::uint8_t n8);
     void and_hl_addr();
@@ -103,6 +103,12 @@ public: // change to private when done debugging
     void cp_r8(Register8 r8);
     void cp_n8(std::uint8_t n8);
     void cp_hl_addr();
+    void inc_r8(Register8 r8);
+    void inc_hl_addr();
+    void dec_r8(Register8 r8);
+    void dec_hl_addr();
+    void add_hl_r16(Register16 r16);
+
     void daa();
 
     void DAA();
