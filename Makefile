@@ -16,13 +16,13 @@ BINARY_NAME := gbemu
 
 # Compile the target
 $(BINARY_NAME): $(OBJ) $(MAIN)
-	clang-format -i -style=file $(MAIN)
+#	clang-format -i -style=file $(MAIN)
 	$(CPP) $(LINKERFLAGS) $(CPPFLAGS) $^ -o $@
 
 # Compile all the object files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(SRC_DIR)/%.hpp
 	mkdir -p $(OBJ_DIR)
-	clang-format -i -style=file $<
+# 	clang-format -i -style=file $<
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
 .PHONY: clean

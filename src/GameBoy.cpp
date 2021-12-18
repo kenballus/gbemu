@@ -305,27 +305,27 @@ int GameBoy::execute_instruction(uint16_t addr) {
         set_doublereg(REG_S, REG_P, get_doublereg(REG_S, REG_P) + 2);
         wait_cycles(3);
         pc += 1;
-        // } else if (instruction == 0b11111000) { // LDHL SP, e
+    // } else if (instruction == 0b11111000) { // LDHL SP, e
     } else if (instruction == 0b00001000) {  // LD (nn), SP
         std::cerr << "LD (nn), SP\n";
         write_mem16(n16, get_doublereg(REG_S, REG_P));
         wait_cycles(5);
         pc += 3;
-        // } else if (top_five == 0b10000 && r8_2 != DUMMY) { // ADD A, r
-        // } else if (instruction == 0b11000110) { // ADD A, n
-        // } else if (instruction == 0b10000110) { // ADD A, (HL)
-        // } else if (top_five == 0b10001 && r8_2 != DUMMY) { // ADC A, r
-        // } else if (instruction == 0b11001110) { // ADC A, n
-        // } else if (instruction == 0b10001110) { // ADC A, (HL)
-        // } else if (top_five == 0b10010 && r8_2 != DUMMY) { // SUB r
-        // } else if (instruction == 0b11010110) { // SUB n
-        // } else if (instruction == 0b10010110) { // SUB (HL)
-        // } else if (top_five == 0b10011 && r8_2 != DUMMY) { // SBC A, r
-        // } else if (instruction == 0b11011110) { // SBC A, n
-        // } else if (instruction == 0b10011110) { // SBC A, (HL)
-        // } else if (top_five == 0b10100 && r8_2 != DUMMY) { // AND r
-        // } else if (instruction == 0b11100110) { // AND n
-        // } else if (instruction == 0b10100110) { // AND (HL)
+    // } else if (top_five == 0b10000 && r8_2 != DUMMY) { // ADD A, r
+    // } else if (instruction == 0b11000110) { // ADD A, n
+    // } else if (instruction == 0b10000110) { // ADD A, (HL)
+    // } else if (top_five == 0b10001 && r8_2 != DUMMY) { // ADC A, r
+    // } else if (instruction == 0b11001110) { // ADC A, n
+    // } else if (instruction == 0b10001110) { // ADC A, (HL)
+    // } else if (top_five == 0b10010 && r8_2 != DUMMY) { // SUB r
+    // } else if (instruction == 0b11010110) { // SUB n
+    // } else if (instruction == 0b10010110) { // SUB (HL)
+    // } else if (top_five == 0b10011 && r8_2 != DUMMY) { // SBC A, r
+    // } else if (instruction == 0b11011110) { // SBC A, n
+    // } else if (instruction == 0b10011110) { // SBC A, (HL)
+    // } else if (top_five == 0b10100 && r8_2 != DUMMY) { // AND r
+    // } else if (instruction == 0b11100110) { // AND n
+    // } else if (instruction == 0b10100110) { // AND (HL)
     } else if (top_five == 0b10110 && r8_2 != DUMMY) {  // OR r
         uint8_t a = get_register8(REG_A);
         uint8_t r = get_register8(r8_1);
@@ -382,15 +382,15 @@ int GameBoy::execute_instruction(uint16_t addr) {
         set_flag(FL_Z, get_register8(REG_A) == 0);
         wait_cycles(2);
         pc += 1;
-        // } else if (top_five == 0b10111 && r8_2 != DUMMY) { // CP r
-        // } else if (instruction == 0b11111110) { // CP n
-        // } else if (instruction == 0b10111110) { // CP (HL)
-        // } else if (top_two == 0b00 && r8_1 != DUMMY && bottom_three == 0b100) { // INC r
-        // } else if (instruction == 0b00110100) { // INC (HL)
-        // } else if (top_two == 0b00 && r8_1 != DUMMY && bottom_three == 0b101) { // DEC r
-        // } else if (instruction == 0b00110101) { // DEC (HL)
-        // } else if ((instruction & 0b11001111) == 0b00001001) { // ADD HL, ss
-        // } else if (instruction == 0b11101000) { // ADD SP, e
+    // } else if (top_five == 0b10111 && r8_2 != DUMMY) { // CP r
+    // } else if (instruction == 0b11111110) { // CP n
+    // } else if (instruction == 0b10111110) { // CP (HL)
+    // } else if (top_two == 0b00 && r8_1 != DUMMY && bottom_three == 0b100) { // INC r
+    // } else if (instruction == 0b00110100) { // INC (HL)
+    // } else if (top_two == 0b00 && r8_1 != DUMMY && bottom_three == 0b101) { // DEC r
+    // } else if (instruction == 0b00110101) { // DEC (HL)
+    // } else if ((instruction & 0b11001111) == 0b00001001) { // ADD HL, ss
+    // } else if (instruction == 0b11101000) { // ADD SP, e
     } else if ((instruction & 0b11001111) == 0b00000011) {  // INC ss
         std::cerr << "INC ss\n";
         set_doublereg(s1, s2, get_doublereg(s1, s2) + 1);
@@ -401,186 +401,186 @@ int GameBoy::execute_instruction(uint16_t addr) {
         set_doublereg(s1, s2, get_doublereg(s1, s2) - 1);
         wait_cycles(2);
         pc += 1;
-        // } else if (instruction == 0b00000111) { // RLCA
-        //     std::cerr << "RLCA\n";
-        //     bool lost_bit = get_register8(REG_A) >> 7;
-        //     set_register8(REG_A, (get_register8(REG_A) << 1) + lost_bit);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, 0);
-        //     wait_cycles(1);
-        //     pc += 1;
-        // } else if (instruction == 0b00010111) { // RLA
-        //     std::cerr << "RLA\n";
-        //     bool lost_bit = get_register8(REG_A) >> 7;
-        //     set_register8(REG_A, get_register8(REG_A) << 1);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, 0);
-        //     wait_cycles(1);
-        //     pc += 1;
-        // } else if (instruction == 0b00001111) { // RRCA
-        //     std::cerr << "RRCA\n";
-        //     bool lost_bit = get_register8(REG_A) & 1;
-        //     set_register8(REG_A, (get_register8(REG_A) >> 1) + (lost_bit << 7));
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, 0);
-        //     wait_cycles(1);
-        //     pc += 1;
-        // } else if (instruction == 0b00011111) { // RRA
-        //     std::cerr << "RRA\n";
-        //     bool lost_bit = get_register8(REG_A) & 1;
-        //     set_register8(REG_A, get_register8(REG_A) >> 1);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, 0);
-        //     wait_cycles(1);
-        //     pc += 1;
-        // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00000 && (n8 & 0b111) != DUMMY) { // RLC r
-        //     std::cerr << "RLC r\n";
-        //     auto r = n8 & 0b111;
-        //     bool lost_bit = get_register8(r) >> 7;
-        //     set_register8(r, (get_register8(r) << 1) + lost_bit);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, get_register8(r) == 0);
-        //     wait_cycles(2);
-        //     pc += 2;
-        // } else if (instruction == 0b11001011 && n8 == 0b00000110) { // RLC (HL)
-        //     std::cerr << "RLC (HL)\n";
-        //     auto hl = get_doublereg(REG_H, REG_L);
-        //     bool lost_bit = read_mem8(hl) >> 7;
-        //     write_mem8(hl, (read_mem8(hl) << 1) + lost_bit);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, read_mem8(hl) == 0);
-        //     wait_cycles(4);
-        //     pc += 2;
-        // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00010 && (n8 & 0b111) != DUMMY) { // RL r
-        //     std::cerr << "RL r\n";
-        //     auto r = n8 & 0b111;
-        //     bool lost_bit = get_register8(r) >> 7;
-        //     set_register8(r, get_register8(r) << 1);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, get_register8(r));
-        //     wait_cycles(2);
-        //     pc += 1;
-        // } else if (instruction == 0b11001011 && n8 == 0b00010110) { // RL (HL)
-        //     std::cerr << "RL (HL)\n";
-        //     auto hl = get_doublereg(REG_H, REG_L);
-        //     bool lost_bit = read_mem8(hl) >> 7;
-        //     write_mem8(hl, read_mem8(hl) << 1);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, read_mem8(hl) == 0);
-        //     wait_cycles(4);
-        //     pc += 2;
-        // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00001 && (n8 & 0b111) != DUMMY) { // RRC r
-        //     std::cerr << "RRC r\n";
-        //     auto r = n8 & 0b111;
-        //     bool lost_bit = get_register8(r) & 0b1;
-        //     set_register8(r, (get_register8(r) >> 1) + lost_bit * 0b10000000);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, get_register8(r) == 0);
-        //     wait_cycles(2);
-        //     pc += 2;
-        // } else if (instruction == 0b11001011 && n8 == 0b00001110) { // RRC (HL)
-        //     std::cerr << "RRC (HL)\n";
-        //     auto hl = get_doublereg(REG_H, REG_L);
-        //     bool lost_bit = read_mem8(hl) & 0b1;
-        //     write_mem8(hl, (read_mem8(hl) >> 1) + lost_bit * 0b10000000);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, read_mem8(hl) == 0);
-        //     wait_cycles(4);
-        //     pc += 2;
-        // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00011 && (n8 & 0b111) != DUMMY) { // RR r
-        //     std::cerr << "RR r\n";
-        //     auto r = n8 & 0b111;
-        //     bool lost_bit = get_register8(r) & 0b1;
-        //     set_register8(r, get_register8(r) >> 1);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, get_register8(r));
-        //     wait_cycles(2);
-        //     pc += 1;
-        // } else if (instruction == 0b11011011 && n8 == 0b00011110) { // RR (HL)
-        //     std::cerr << "RR (HL)\n";
-        //     auto hl = get_doublereg(REG_H, REG_L);
-        //     bool lost_bit = read_mem8(hl) & 0b1;
-        //     write_mem8(hl, read_mem8(hl) >> 1);
-        //     set_flag(FL_C, lost_bit);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, read_mem8(hl) == 0);
-        //     wait_cycles(4);
-        //     pc += 2;
-        // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00100 && (n8 & 0b111) != DUMMY) { // SLA r
-        //     std::cerr << "SLA r\n";
-        //     uint8_t const r = n8 & 0b111;
-        //     set_flag(FL_C, get_register8(r) >> 7);
-        //     set_register8(r, get_register8(r) << 1);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, get_register8(r) == 0);
-        //     wait_cycles(2);
-        //     pc += 2;
-        // } else if (instruction == 0b11011011 && n8 == 0b00100110) { // SLA (HL)
-        //     std::cerr << "SLA (HL)\n";
-        //     uint16_t const hl = get_doublereg(REG_H, REG_L);
-        //     uint8_t const hl_read = read_mem8(REG_H, REG_L);
-        //     set_flag(FL_C, hl_read >> 7);
-        //     write_mem8(hl, hl_read << 1);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, read_mem8(REG_H, REG_L) == 0);
-        //     wait_cycles(4);
-        //     pc += 2;
-        // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00101 && (n8 & 0b111) != DUMMY) { // SRA r
-        //     std::cerr << "SRA r\n";
-        //     uint8_t const r = n8 & 0b111;
-        //     set_flag(FL_C, get_register8(r) & 0b1);
-        //     set_register8(r, get_register8(r) >> 1);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, get_register8(r) == 0);
-        //     wait_cycles(2);
-        //     pc += 2;
-        // } else if (instruction == 0b11001011 && n8 == 0b00101110) { // SRA (HL)
-        //     std::cerr << "SLA (HL)\n";
-        //     uint16_t const hl = get_doublereg(REG_H, REG_L);
-        //     uint8_t const hl_read = read_mem8(REG_H, REG_L);
-        //     set_flag(FL_C, hl_read & 0b1);
-        //     write_mem8(hl, hl_read >> 1);
-        //     set_flag(FL_H, 0);
-        //     set_flag(FL_N, 0);
-        //     set_flag(FL_Z, read_mem8(REG_H, REG_L) == 0);
-        //     wait_cycles(4);
-        //     pc += 2;
-        // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00111 && (n8 & 0b111) != DUMMY) { // SRL r
-        // } else if (instruction == 0b11001011 && n8 == 0b00111110) { // SRL (HL)
-        // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00110 && (n8 & 0b111) != DUMMY) { // SWAP r
-        // } else if (instruction == 0b11001011 && n8 == 0b00110110) { // SWAP (HL)
-        // } else if (instruction == 0b11001011 && n8 >> 6 == 0b01 && n8 & 0b111 != DUMMY) { // BIT b, r
-        // } else if (instruction == 0b11001011 && n8 >> 6 == 0b01 && n8 & 0b111 == DUMMY) { // BIT b, (HL)
-        // } else if (instruction == 0b11001011 && n8 >> 6 == 0b11 && n8 & 0b111 != DUMMY) { // SET b, r
-        // } else if (instruction == 0b11001011 && n8 >> 6 == 0b11 && n8 & 0b111 == DUMMY) { // SET b, (HL)
-        // } else if (instruction == 0b11001011 && n8 >> 6 == 0b10 && n8 & 0b111 != DUMMY) { // RES b, r
-        // } else if (instruction == 0b11001011 && n8 >> 6 == 0b10 && n8 & 0b111 == DUMMY) { // RES b, (HL)
+    // } else if (instruction == 0b00000111) { // RLCA
+    //     std::cerr << "RLCA\n";
+    //     bool lost_bit = get_register8(REG_A) >> 7;
+    //     set_register8(REG_A, (get_register8(REG_A) << 1) + lost_bit);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, 0);
+    //     wait_cycles(1);
+    //     pc += 1;
+    // } else if (instruction == 0b00010111) { // RLA
+    //     std::cerr << "RLA\n";
+    //     bool lost_bit = get_register8(REG_A) >> 7;
+    //     set_register8(REG_A, get_register8(REG_A) << 1);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, 0);
+    //     wait_cycles(1);
+    //     pc += 1;
+    // } else if (instruction == 0b00001111) { // RRCA
+    //     std::cerr << "RRCA\n";
+    //     bool lost_bit = get_register8(REG_A) & 1;
+    //     set_register8(REG_A, (get_register8(REG_A) >> 1) + (lost_bit << 7));
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, 0);
+    //     wait_cycles(1);
+    //     pc += 1;
+    // } else if (instruction == 0b00011111) { // RRA
+    //     std::cerr << "RRA\n";
+    //     bool lost_bit = get_register8(REG_A) & 1;
+    //     set_register8(REG_A, get_register8(REG_A) >> 1);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, 0);
+    //     wait_cycles(1);
+    //     pc += 1;
+    // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00000 && (n8 & 0b111) != DUMMY) { // RLC r
+    //     std::cerr << "RLC r\n";
+    //     auto r = n8 & 0b111;
+    //     bool lost_bit = get_register8(r) >> 7;
+    //     set_register8(r, (get_register8(r) << 1) + lost_bit);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, get_register8(r) == 0);
+    //     wait_cycles(2);
+    //     pc += 2;
+    // } else if (instruction == 0b11001011 && n8 == 0b00000110) { // RLC (HL)
+    //     std::cerr << "RLC (HL)\n";
+    //     auto hl = get_doublereg(REG_H, REG_L);
+    //     bool lost_bit = read_mem8(hl) >> 7;
+    //     write_mem8(hl, (read_mem8(hl) << 1) + lost_bit);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, read_mem8(hl) == 0);
+    //     wait_cycles(4);
+    //     pc += 2;
+    // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00010 && (n8 & 0b111) != DUMMY) { // RL r
+    //     std::cerr << "RL r\n";
+    //     auto r = n8 & 0b111;
+    //     bool lost_bit = get_register8(r) >> 7;
+    //     set_register8(r, get_register8(r) << 1);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, get_register8(r));
+    //     wait_cycles(2);
+    //     pc += 1;
+    // } else if (instruction == 0b11001011 && n8 == 0b00010110) { // RL (HL)
+    //     std::cerr << "RL (HL)\n";
+    //     auto hl = get_doublereg(REG_H, REG_L);
+    //     bool lost_bit = read_mem8(hl) >> 7;
+    //     write_mem8(hl, read_mem8(hl) << 1);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, read_mem8(hl) == 0);
+    //     wait_cycles(4);
+    //     pc += 2;
+    // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00001 && (n8 & 0b111) != DUMMY) { // RRC r
+    //     std::cerr << "RRC r\n";
+    //     auto r = n8 & 0b111;
+    //     bool lost_bit = get_register8(r) & 0b1;
+    //     set_register8(r, (get_register8(r) >> 1) + lost_bit * 0b10000000);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, get_register8(r) == 0);
+    //     wait_cycles(2);
+    //     pc += 2;
+    // } else if (instruction == 0b11001011 && n8 == 0b00001110) { // RRC (HL)
+    //     std::cerr << "RRC (HL)\n";
+    //     auto hl = get_doublereg(REG_H, REG_L);
+    //     bool lost_bit = read_mem8(hl) & 0b1;
+    //     write_mem8(hl, (read_mem8(hl) >> 1) + lost_bit * 0b10000000);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, read_mem8(hl) == 0);
+    //     wait_cycles(4);
+    //     pc += 2;
+    // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00011 && (n8 & 0b111) != DUMMY) { // RR r
+    //     std::cerr << "RR r\n";
+    //     auto r = n8 & 0b111;
+    //     bool lost_bit = get_register8(r) & 0b1;
+    //     set_register8(r, get_register8(r) >> 1);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, get_register8(r));
+    //     wait_cycles(2);
+    //     pc += 1;
+    // } else if (instruction == 0b11011011 && n8 == 0b00011110) { // RR (HL)
+    //     std::cerr << "RR (HL)\n";
+    //     auto hl = get_doublereg(REG_H, REG_L);
+    //     bool lost_bit = read_mem8(hl) & 0b1;
+    //     write_mem8(hl, read_mem8(hl) >> 1);
+    //     set_flag(FL_C, lost_bit);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, read_mem8(hl) == 0);
+    //     wait_cycles(4);
+    //     pc += 2;
+    // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00100 && (n8 & 0b111) != DUMMY) { // SLA r
+    //     std::cerr << "SLA r\n";
+    //     uint8_t const r = n8 & 0b111;
+    //     set_flag(FL_C, get_register8(r) >> 7);
+    //     set_register8(r, get_register8(r) << 1);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, get_register8(r) == 0);
+    //     wait_cycles(2);
+    //     pc += 2;
+    // } else if (instruction == 0b11011011 && n8 == 0b00100110) { // SLA (HL)
+    //     std::cerr << "SLA (HL)\n";
+    //     uint16_t const hl = get_doublereg(REG_H, REG_L);
+    //     uint8_t const hl_read = read_mem8(REG_H, REG_L);
+    //     set_flag(FL_C, hl_read >> 7);
+    //     write_mem8(hl, hl_read << 1);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, read_mem8(REG_H, REG_L) == 0);
+    //     wait_cycles(4);
+    //     pc += 2;
+    // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00101 && (n8 & 0b111) != DUMMY) { // SRA r
+    //     std::cerr << "SRA r\n";
+    //     uint8_t const r = n8 & 0b111;
+    //     set_flag(FL_C, get_register8(r) & 0b1);
+    //     set_register8(r, get_register8(r) >> 1);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, get_register8(r) == 0);
+    //     wait_cycles(2);
+    //     pc += 2;
+    // } else if (instruction == 0b11001011 && n8 == 0b00101110) { // SRA (HL)
+    //     std::cerr << "SLA (HL)\n";
+    //     uint16_t const hl = get_doublereg(REG_H, REG_L);
+    //     uint8_t const hl_read = read_mem8(REG_H, REG_L);
+    //     set_flag(FL_C, hl_read & 0b1);
+    //     write_mem8(hl, hl_read >> 1);
+    //     set_flag(FL_H, 0);
+    //     set_flag(FL_N, 0);
+    //     set_flag(FL_Z, read_mem8(REG_H, REG_L) == 0);
+    //     wait_cycles(4);
+    //     pc += 2;
+    // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00111 && (n8 & 0b111) != DUMMY) { // SRL r
+    // } else if (instruction == 0b11001011 && n8 == 0b00111110) { // SRL (HL)
+    // } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00110 && (n8 & 0b111) != DUMMY) { // SWAP r
+    // } else if (instruction == 0b11001011 && n8 == 0b00110110) { // SWAP (HL)
+    // } else if (instruction == 0b11001011 && n8 >> 6 == 0b01 && n8 & 0b111 != DUMMY) { // BIT b, r
+    // } else if (instruction == 0b11001011 && n8 >> 6 == 0b01 && n8 & 0b111 == DUMMY) { // BIT b, (HL)
+    // } else if (instruction == 0b11001011 && n8 >> 6 == 0b11 && n8 & 0b111 != DUMMY) { // SET b, r
+    // } else if (instruction == 0b11001011 && n8 >> 6 == 0b11 && n8 & 0b111 == DUMMY) { // SET b, (HL)
+    // } else if (instruction == 0b11001011 && n8 >> 6 == 0b10 && n8 & 0b111 != DUMMY) { // RES b, r
+    // } else if (instruction == 0b11001011 && n8 >> 6 == 0b10 && n8 & 0b111 == DUMMY) { // RES b, (HL)
     } else if (instruction == 0b11000011) {  // JP nn
         std::cerr << "JP nn\n";
         pc = n16;
@@ -597,8 +597,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
             wait_cycles(3);
             pc += 3;
         }
-        // } else if (instruction == 0b00011000) { // JR e
-        // } else if ((instruction & 0b11100111) == 0b00100000) { // JR cc, e
+    // } else if (instruction == 0b00011000) { // JR e
+    // } else if ((instruction & 0b11100111) == 0b00100000) { // JR cc, e
     } else if (instruction == 0b11101001) {  // JP (HL)
         std::cerr << "JP (HL)\n";
         pc = get_doublereg(REG_H, REG_L);
@@ -634,7 +634,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         set_doublereg(REG_S, REG_P, sp + 2);
         wait_cycles(4);
         // Don't increment pc here
-        // } else if (instruction == 0b11011001) { // RETI
+    // } else if (instruction == 0b11011001) { // RETI
     } else if ((instruction & 0b11100111) == 0b11000000) {  // RET cc
         uint8_t cc = (instruction >> 3) & 0b11;
         bool retting = (cc == 0b00 && get_flag(FL_Z) == 0) || (cc == 0b01 && get_flag(FL_Z) == 1) ||
@@ -657,7 +657,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         pc = 8 * r8_1;
         wait_cycles(4);
         pc += 1;
-        // } else if (instruction == 0b00100111) { // DAA
+    // } else if (instruction == 0b00100111) { // DAA
     } else if (instruction == 0b00101111) {  // CPL
         std::cerr << "CPL\n";
         set_register8(REG_A, ~get_register8(REG_A));
