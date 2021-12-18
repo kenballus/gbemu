@@ -1,2 +1,5 @@
 gbemu
 *.o
+*.pdf
+external_resources/*
+.gdb_history
