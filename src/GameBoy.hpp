@@ -17,7 +17,7 @@
 #define BG_MAP_DATA_1 0x9800
 #define BG_MAP_DATA_2 0x9C00
 #define CARTRIDGE_RAM 0xA000
-#define IWRAM 0xC000
+#define WRAM 0xC000
 #define ECHO_RAM 0xE000 // Not recommended for use
 #define OAM 0xFE00
 #define UNUSED_ADDRESSES 0xFEA0 // Not recommended for use
@@ -40,10 +40,10 @@ enum Register8 {
 };
 
 enum Flag {
-    FL_C = 1 << 7,
-    FL_H = 1 << 6,
-    FL_N = 1 << 5,
-    FL_Z = 1 << 4,
+    FL_Z = 1 << 7,
+    FL_N = 1 << 6,
+    FL_H = 1 << 5,
+    FL_C = 1 << 4,
 };
 
 class GameBoy {
@@ -54,6 +54,7 @@ public: // change to private when done debugging
 
     int cycles_to_wait = 0;
 
+    GameBoy();
     void load_rom(std::string romfile);
     void wait_cycles(std::uint8_t cycles_to_wait);
 

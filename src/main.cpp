@@ -13,8 +13,10 @@
 #define FRAMERATE 60  // in fps
 
 typedef Uint32 pixel_t;
-pixel_t color_off;
-pixel_t color_on;
+pixel_t color_white;
+pixel_t color_light_grey;
+pixel_t color_dark_grey;
+pixel_t color_black;
 
 void error_out(std::string my_error = "") {
     if (my_error != "") {
@@ -49,8 +51,10 @@ void init(SDL_Window*& window, SDL_Renderer*& renderer, SDL_Texture*& gb_screen)
     if (format->BitsPerPixel != sizeof(pixel_t) * 8) {
         error_out("Wrong bpp!");
     }
-    color_off = SDL_MapRGB(format, 0, 0, 0);
-    color_on = SDL_MapRGB(format, 0xFF, 0xFF, 0xFF);
+    color_white = SDL_MapRGB(format, 0xFF, 0xFF, 0xFF);
+    color_light_grey = SDL_MapRGB(format, 0xaa, 0xaa, 0xaa);
+    color_dark_grey = SDL_MapRGB(format, 0x55, 0x55, 0x55);
+    color_black = SDL_MapRGB(format, 0x00, 0x00, 0x00);
     SDL_FreeFormat(format);
 
     gb_screen = SDL_CreateTexture(renderer, SDL_GetWindowPixelFormat(window), SDL_TEXTUREACCESS_STREAMING,
@@ -81,7 +85,7 @@ void update_gb_screen(GameBoy const& gb, SDL_Texture* gb_screen, SDL_Renderer* r
     pixel_t* pixels = (pixel_t*)raw_pixels;
     for (size_t r = 0; r < GB_SCREEN_HEIGHT; r++) {
         for (size_t c = 0; c < GB_SCREEN_WIDTH; c++) {
-            // Placeholder. Should copy out of vram depending on graphics mode
+            // Placeholder. Should copy out of vram
             pixels[0] = pixels[0];
         }
     }

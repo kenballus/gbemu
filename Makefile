@@ -28,4 +28,9 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(SRC_DIR)/%.hpp
 .PHONY: clean
 clean:
 	rm -f $(OBJ_DIR)/*.o $(BINARY_NAME)
-	rmdir --ignore-fail-on-non-empty $(OBJ_DIR)
+	rm -f test/test.o
+	rm -f test.gb
+
+test.gb:
+	rgbasm -L -o test/test.o test/test.asm
+	rgblink -o test.gb test/test.o
