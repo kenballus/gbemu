@@ -3,3 +3,4 @@ gbemu
 *.pdf
 external_resources/*
 .gdb_history
+*.gb

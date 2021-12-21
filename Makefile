@@ -7,15 +7,14 @@ _OBJ := GameBoy
 OBJ := $(patsubst %, $(OBJ_DIR)/%, $(_OBJ).o)
 
 SRC_DIR := src
-
 MAIN := $(SRC_DIR)/main.cpp
+BINARY := gbemu
+TEST := test
 
-BINARY_NAME := gbemu
-
-.DEFAULT_GOAL := $(BINARY_NAME)
+all: $(BINARY) $(TEST).gb
 
 # Compile the target
-$(BINARY_NAME): $(OBJ) $(MAIN)
+$(BINARY): $(OBJ) $(MAIN)
 #	clang-format -i -style=file $(MAIN)
 	$(CPP) $(LINKERFLAGS) $(CPPFLAGS) $^ -o $@
 
@@ -27,10 +26,12 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(SRC_DIR)/%.hpp
 
 .PHONY: clean
 clean:
-	rm -f $(OBJ_DIR)/*.o $(BINARY_NAME)
-	rm -f test/test.o
-	rm -f test.gb
+	rm -f $(OBJ_DIR)/*.o $(BINARY)
+	rm -f $(TEST)/$(TEST).o
+	rm -f $(TEST).gb
 
-test.gb:
-	rgbasm -L -o test/test.o test/test.asm
-	rgblink -o test.gb test/test.o
+$(TEST)/$(TEST).o: $(TEST)/$(TEST).asm
+	rgbasm -L -o $(TEST)/$(TEST).o $(TEST)/$(TEST).asm
+
+$(TEST).gb: $(TEST)/$(TEST).o
+	rgblink -o $(TEST).gb $(TEST)/$(TEST).o

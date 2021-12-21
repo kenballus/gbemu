@@ -10,7 +10,6 @@
 
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 640
-#define FRAMERATE 60  // in fps
 
 typedef Uint32 pixel_t;
 pixel_t color_white;
@@ -80,13 +79,24 @@ void deinit(SDL_Window*& window, SDL_Renderer*& renderer, SDL_Texture*& gb_scree
 
 void update_gb_screen(GameBoy const& gb, SDL_Texture* gb_screen, SDL_Renderer* renderer, SDL_Window* window) {
     void* raw_pixels = NULL;
-    int _ = 0;
-    SDL_LockTexture(gb_screen, NULL, &raw_pixels, &_);
+    int unused = 0;
+    SDL_LockTexture(gb_screen, NULL, &raw_pixels, &unused);
     pixel_t* pixels = (pixel_t*)raw_pixels;
     for (size_t r = 0; r < GB_SCREEN_HEIGHT; r++) {
         for (size_t c = 0; c < GB_SCREEN_WIDTH; c++) {
-            // Placeholder. Should copy out of vram
-            pixels[0] = pixels[0];
+            uint8_t color_bits = gb.screen[r * GB_SCREEN_WIDTH + c];
+            pixel_t pixel_color;
+            switch (color_bits) {
+                case 0b00:
+                    pixel_color = color_white;
+                case 0b01:
+                    pixel_color = color_light_grey;
+                case 0b10:
+                    pixel_color = color_dark_grey;
+                case 0b11:
+                    pixel_color = color_black;
+            }
+            pixels[r * GB_SCREEN_WIDTH + c] = pixel_color;
         }
     }
 
@@ -129,12 +139,13 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-
-        if (gb.execute_instruction(gb.pc) != 0) {
+        auto ret = gb.execute_instruction(gb.pc);
+        if (ret != 0) {
             gb.dump_state();
             gb.dump_mem();
             break;
         }
+        gb.wait();
     }
 done:
 
