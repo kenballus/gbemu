@@ -145,7 +145,7 @@ GameBoy::GameBoy() {
 void GameBoy::load_rom(std::string romfile) {
     std::streampos size;
 
-    std::ifstream ifs = std::ifstream(romfile, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream ifs(romfile, std::ios::in | std::ios::binary | std::ios::ate);
     if (ifs.is_open()) {
         size = ifs.tellg();
         ifs.seekg(0, std::ios::beg);
