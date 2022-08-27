@@ -353,7 +353,7 @@ void GameBoy::dump_mem() const {
     std::stringstream ss;
     ss << std::setfill('0') << std::uppercase << std::hex;
 
-    for (int i = 0; i < TOTAL_RAM; i++) {
+    for (uint32_t i = 0; i < TOTAL_RAM; i++) {
         ss << std::setw(2) << (int)read_mem8(i) << std::setw(0) << (i % 16 == 7 ? "  " : (i % 16 == 15 ? "\n" : " "));
         if (i % 16 == 15) {
             prev_line = line;
@@ -372,8 +372,8 @@ void GameBoy::dump_mem() const {
 }
 
 void GameBoy::dump_screen() const {
-    for (int r = 0; r < GB_SCREEN_HEIGHT; r++) {
-        for (int c = 0; c < GB_SCREEN_WIDTH; c++) {
+    for (uint16_t r = 0; r < GB_SCREEN_HEIGHT; r++) {
+        for (uint16_t c = 0; c < GB_SCREEN_WIDTH; c++) {
             std::cout << (screen[r * GB_SCREEN_WIDTH + c] ? "X" : "O");
         }
         std::cout << "\n";
