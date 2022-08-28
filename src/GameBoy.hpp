@@ -11,15 +11,15 @@
 #define IVT_OFFSET 0x0000
 #define HEADER_OFFSET 0x0100
 #define ROM_BANK_0 0x0150
-#define ROM_BANK_1 0x4000 // Switchable
+#define ROM_BANK_1 0x4000
 #define CHARACTER_RAM 0x8000
 #define BG_MAP_DATA_1 0x9800
 #define BG_MAP_DATA_2 0x9C00
 #define CARTRIDGE_RAM 0xA000
 #define WRAM 0xC000
-#define ECHO_RAM 0xE000 // Not recommended for use
+#define ECHO_RAM 0xE000
 #define OAM 0xFE00
-#define UNUSED_ADDRESSES 0xFEA0 // Not recommended for use
+#define UNUSED_ADDRESSES 0xFEA0
 #define IO_REGS 0xFF00
 #define FAST_RAM 0xFF80
 #define INTERRUPT_ENABLE 0xFFFF
@@ -36,6 +36,7 @@
 #define SCX 0xFF43
 #define LY 0xFF44
 #define LYC 0xFF45
+#define DMA_START 0xFF46
 #define WY 0xFF4A
 
 #define JOYPAD_PORT 0xFF00

@@ -292,6 +292,9 @@ void GameBoy::write_mem8(uint16_t addr, uint8_t val) {
         }
         ram[addr] = val;
     }
+    else if (addr == DMA_START) {
+        do_dma(val);
+    }
     else if (is_writable(addr)) {
         ram[addr] = val;
     }
@@ -330,6 +333,13 @@ void GameBoy::set_flag(Flag flag, bool val) {
 }
 
 bool GameBoy::get_flag(Flag flag) const { return get_register8(REG_F) & flag; }
+
+void GameBoy::do_dma(uint8_t const start_address) {
+    uint16_t const real_start_address = start_address << 8;
+    for (uint16_t i = 0; i < 0xFF; i++) {
+        write_mem8(OAM + i; read_mem8(real_start_address + i))
+    }
+}
 
 void GameBoy::dump_state() const {
     std::cout << std::setfill('0') << std::uppercase << std::hex << "AF: " << std::setw(4)
