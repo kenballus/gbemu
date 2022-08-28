@@ -107,6 +107,7 @@ public: // change to private when done debugging
     std::uint16_t get_doublereg(Register8 r8_1, Register8 r8_2) const;
     void set_flag(Flag flag, bool val);
     bool get_flag(Flag flag) const;
+    void do_dma(uint8_t const start_address);
 
     int execute_instruction(std::uint16_t addr);
     void dump_state() const;

@@ -337,7 +337,7 @@ bool GameBoy::get_flag(Flag flag) const { return get_register8(REG_F) & flag; }
 void GameBoy::do_dma(uint8_t const start_address) {
     uint16_t const real_start_address = start_address << 8;
     for (uint16_t i = 0; i < 0xFF; i++) {
-        write_mem8(OAM + i; read_mem8(real_start_address + i))
+        write_mem8(OAM + i, read_mem8(real_start_address + i));
     }
 }
 
@@ -802,7 +802,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11111110) { // CP n
-        std::cerr << "CP n\n";
+        std::cerr << "CP n (n = " << n8 << ")\n";
         uint8_t const a = get_register8(REG_A);
         set_flag(FL_C, detect_borrow(a, n8, 8));
         set_flag(FL_H, detect_borrow(a, n8, 4));
