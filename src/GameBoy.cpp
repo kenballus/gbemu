@@ -82,6 +82,9 @@ std::string stringify_cc_condition(uint8_t cc) {
 }
 
 bool is_writable(uint16_t addr) {
+    if (0xFE00 <= addr && addr <= 0xFEff) { // This is a hack. OAM should not be writable (or readable) at all times.
+        return true;
+    }
     return (addr >= CHARACTER_RAM) && (addr < ECHO_RAM || addr >= OAM) && (addr < UNUSED_ADDRESSES || addr >= IO_REGS);
 }
 
@@ -102,16 +105,16 @@ bool detect_borrow(uint32_t a, uint32_t b, uint8_t bit) {
     return a < b;
 }
 
-GameBoy::GameBoy() {
+GameBoy::GameBoy(void) {
     std::cerr << "Bringin' her up!\n";
     set_doublereg(REG_A, REG_F, 0x01B0);
     set_doublereg(REG_B, REG_C, 0x0013);
     set_doublereg(REG_D, REG_E, 0x00D8);
     set_doublereg(REG_H, REG_L, 0x014D);
     set_doublereg(REG_S, REG_P, 0xFFFE);
-    write_mem8(0xFF05, 0x00);
-    write_mem8(0xFF06, 0x00);
-    write_mem8(0xFF07, 0x00);
+    write_mem8(TIMA, 0x00);
+    write_mem8(TMA, 0x00);
+    write_mem8(TAC, 0x00);
     write_mem8(0xFF10, 0x80);
     write_mem8(0xFF11, 0xBF);
     write_mem8(0xFF12, 0xF3);
@@ -130,15 +133,18 @@ GameBoy::GameBoy() {
     write_mem8(0xFF24, 0x77);
     write_mem8(0xFF25, 0xF3);
     write_mem8(0xFF26, 0xF1);
-    write_mem8(0xFF40, 0x91);
-    write_mem8(0xFF42, 0x00);
-    write_mem8(0xFF43, 0x00);
-    write_mem8(0xFF45, 0x00);
+    write_mem8(LCD_CONTROL, 0x91);
+    ram[LCD_STATUS] = 0x81; // This is an illegal write otherwise.
+    write_mem8(SCY, 0x00);
+    write_mem8(SCX, 0x00);
+    write_mem8(LY, 0x91);
+    write_mem8(LYC, 0x00);
+    ram[DMA_START] = 0xFF; // Don't want to trigger a DMA right now.
     write_mem8(0xFF47, 0xFC);
     write_mem8(0xFF48, 0xFF);
     write_mem8(0xFF49, 0xFF);
-    write_mem8(0xFF4A, 0x00);
-    write_mem8(0xFF4B, 0x00);
+    write_mem8(WY, 0x00);
+    write_mem8(WX, 0x00);
     write_mem8(0xFFFF, 0x00);
 }
 
@@ -156,31 +162,25 @@ void GameBoy::load_rom(std::string romfile) {
     }
 }
 
-void GameBoy::wait() {
+void GameBoy::wait(void) {
+    bool const timer_enabled = (read_mem8(TAC) >> 2) & 0b1;
+
     while (cycles_to_wait != 0) {
         cycle_count += 1;
         cycles_to_wait -= 1;
         if (cycle_count % CLOCKS_PER_DIVIDER_INCREMENT == 0) {
+            std::cerr << "    Resetting the divider register!\n";
             write_mem8(DIVIDER_REGISTER, read_mem8(DIVIDER_REGISTER + 1));
         }
 
-        uint16_t clocks_per_timer_increment;
-        switch (ram[TAC] & 0b11) {
-            case 0b00:
-                clocks_per_timer_increment = 256; // (our clocks, which are the true clocks / 4)
-                break;
-            case 0b01:
-                clocks_per_timer_increment = 4;
-                break;
-            case 0b10:
-                clocks_per_timer_increment = 16;
-                break;
-            case 0b11:
-                clocks_per_timer_increment = 64;
-                break;
-        }
+        // (our clocks, which are the true clocks / 4)
+        uint16_t const clocks_per_timer_increment = 1 << (((((read_mem8(TAC) & 0b11) - 1) % 4) + 1) * 2);
+        // This gives the following mapping:
+        // 0 -> 256
+        // 1 -> 4
+        // 2 -> 16
+        // 3 -> 64
 
-        bool timer_enabled = (read_mem8(TAC) >> 2) & 0b1;
         if (timer_enabled && cycle_count % clocks_per_timer_increment == 0) {
             if (read_mem8(TIMA) == 0xFF) {
                 write_mem8(TIMA, read_mem8(TMA)); // BUG:
@@ -193,12 +193,16 @@ void GameBoy::wait() {
             }
         }
 
+        if ((read_mem8(LCD_CONTROL) >> 7)) { // If the LCD is enabled (LCDC.7)
+            update_screen();
+        }
+
         // You should actually wait some amount of time here.
     }
 }
 
 // Stub
-uint8_t GameBoy::read_joypad() const {
+uint8_t GameBoy::read_joypad(void) const {
     return 0b00000000;
 }
 
@@ -210,6 +214,8 @@ uint8_t GameBoy::read_mem8(uint16_t addr) const {
         return read_joypad();
     }
     return ram[addr];
+
+    // BUG: OAM should not be readable at all times.
 }
 
 uint16_t GameBoy::read_mem16(uint16_t addr) const {
@@ -218,7 +224,7 @@ uint16_t GameBoy::read_mem16(uint16_t addr) const {
     return (read_mem8(addr + 1) << 8) | read_mem8(addr);
 }
 
-void GameBoy::handle_interrupts() {
+void GameBoy::handle_interrupts(void) {
     if (!ime) {
         return;
     }
@@ -229,11 +235,17 @@ void GameBoy::handle_interrupts() {
         return;
     }
 
-    bool vblank = ((interrupt_bits >> 0) & 0b1);
-    bool lcd_state = ((interrupt_bits >> 1) & 0b1);
-    bool timer = ((interrupt_bits >> 2) & 0b1);
-    bool serial = ((interrupt_bits >> 3) & 0b1);
-    bool joypad = ((interrupt_bits >> 4) & 0b1);
+    bool const vblank = ((interrupt_bits >> 0) & 0b1);
+    bool const lcd_state = ((interrupt_bits >> 1) & 0b1);
+    bool const timer = ((interrupt_bits >> 2) & 0b1);
+    bool const serial = ((interrupt_bits >> 3) & 0b1);
+    bool const joypad = ((interrupt_bits >> 4) & 0b1);
+
+    bool const vblank_interrupt_enabled = (read_mem8(INTERRUPT_ENABLE) >> 0) & 0b1;
+    bool const lcd_state_interrupt_enabled = (read_mem8(INTERRUPT_ENABLE) >> 1) & 0b1;
+    bool const timer_interrupt_enabled = (read_mem8(INTERRUPT_ENABLE) >> 2) & 0b1;
+    bool const serial_interrupt_enabled = (read_mem8(INTERRUPT_ENABLE) >> 3) & 0b1;
+    bool const joypad_interrupt_enabled = (read_mem8(INTERRUPT_ENABLE) >> 4) & 0b1;
 
     ime = 0;
 
@@ -242,26 +254,37 @@ void GameBoy::handle_interrupts() {
     write_mem8(sp - 2, pc & 0xFF);
     set_doublereg(REG_S, REG_P, sp - 2);
 
-    if (vblank) {
-        pc = VBLANK_INTERRUPT_ADDRESS;
+    uint16_t new_pc = 0; // This would be an invalid place to execute code from, I think.
+                         // It at least FEELS like a safe choice. We'll see.
+    if (vblank && vblank_interrupt_enabled) {
+        new_pc = VBLANK_INTERRUPT_ADDRESS;
         write_mem8(INTERRUPT_FLAGS, interrupt_bits & ~(1 << 0));
     }
-    else if (lcd_state) {
-        pc = LCD_STAT_INTERRUPT_ADDRESS;
+    else if (lcd_state && lcd_state_interrupt_enabled) {
+        new_pc = LCD_STAT_INTERRUPT_ADDRESS;
         write_mem8(INTERRUPT_FLAGS, interrupt_bits & ~(1 << 1));
     }
-    else if (timer) {
-        pc = TIMER_INTERRUPT_ADDRESS;
+    else if (timer && timer_interrupt_enabled) {
+        new_pc = TIMER_INTERRUPT_ADDRESS;
         write_mem8(INTERRUPT_FLAGS, interrupt_bits & ~(1 << 2));
     }
-    else if (serial) {
-        pc = SERIAL_INTERRUPT_ADDRESS;
+    else if (serial && serial_interrupt_enabled) {
+        new_pc = SERIAL_INTERRUPT_ADDRESS;
         write_mem8(INTERRUPT_FLAGS, interrupt_bits & ~(1 << 3));
     }
-    else if (joypad) {
-        pc = JOYPAD_INTERRUPT_ADDRESS;
+    else if (joypad && joypad_interrupt_enabled) {
+        new_pc = JOYPAD_INTERRUPT_ADDRESS;
         write_mem8(INTERRUPT_FLAGS, interrupt_bits & ~(1 << 4));
     }
+
+    if (new_pc != 0) {
+        // Do the interrupt call
+        write_mem8(sp - 1, pc >> 8);
+        write_mem8(sp - 2, pc & 0xFF);
+        pc = new_pc;
+        set_doublereg(REG_S, REG_P, sp - 2);
+    }
+
     cycles_to_wait += 5;
 }
 
@@ -297,6 +320,9 @@ void GameBoy::write_mem8(uint16_t addr, uint8_t val) {
     }
     else if (is_writable(addr)) {
         ram[addr] = val;
+    }
+    else if (0x2000 <= addr && addr <= 0x5FFF) {
+        std::cerr << "Attempted bank switch, which is not implemented.\n";
     }
     else {
         std::cerr << "Attempted illegal write of " << std::hex << (int)val << " to address 0x" << (int)addr << std::dec
@@ -341,7 +367,76 @@ void GameBoy::do_dma(uint8_t const start_address) {
     }
 }
 
-void GameBoy::dump_state() const {
+void GameBoy::enter_hblank(void) {
+    // Write down the current graphics mode
+    ram[LCD_STATUS] = (read_mem8(LCD_STATUS) & 0b11111100) + 0b00;
+    // Mark that vblank interrupts cannot happen now
+    write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) & 0b11111110);
+
+    graphics_mode = HBLANK;
+}
+
+void GameBoy::enter_vblank(void) {
+    // Write down the current graphics mode
+    ram[LCD_STATUS] = (read_mem8(LCD_STATUS) & 0b11111100) + 0b01;
+    // Mark that vblank interrupts can happen now
+    write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) | 0b00000001);
+
+    graphics_mode = VBLANK;
+}
+
+void GameBoy::enter_searching(void) {
+    // Write down the current graphics mode
+    ram[LCD_STATUS] = (read_mem8(LCD_STATUS) & 0b11111100) + 0b10;
+    // Mark that vblank interrupts cannot happen now
+    write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) & 0b11111110);
+
+    graphics_mode = SEARCHING;
+}
+
+void GameBoy::enter_transferring(void) {
+    // Write down the current graphics mode
+    ram[LCD_STATUS] = (read_mem8(LCD_STATUS) & 0b11111100) + 0b11;
+    // Mark that vblank interrupts cannot happen now
+    write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) & 0b11111110);
+
+    graphics_mode = TRANSFERRING;
+}
+
+void GameBoy::update_screen(void) {
+    // Called once per CPU cycle, if the LCD is enabled.
+
+    dot_count += 4; // Dot clock = real clock = 4 * our clock
+    dot_count %= 70224; // It takes 70224 dots to do one frame
+
+    // Update the current line number
+    if (dot_count % 456 == 0) {
+        write_mem8(LY, dot_count / 456);
+    }
+
+    if (dot_count >= 65664) { // vblank
+        if (graphics_mode != VBLANK) {
+            enter_vblank();
+        }
+    }
+    else if (dot_count % 456 >= 248) { // hblank (not yet allowing mode 3 extension)
+        if (graphics_mode != HBLANK) {
+            enter_hblank();
+        }
+    }
+    else if (dot_count % 456 >= 80) { // transferring (not yet allowing mode 3 extension)
+        if (graphics_mode != TRANSFERRING) {
+            enter_transferring();
+        }
+    }
+    else if (dot_count % 456 < 80) { // searching
+        if (graphics_mode != SEARCHING) {
+            enter_searching();
+        }
+    }
+}
+
+void GameBoy::dump_state(void) const {
     std::cout << std::setfill('0') << std::uppercase << std::hex << "AF: " << std::setw(4)
               << (int)get_doublereg(REG_A, REG_F) << std::setw(0) << ",  "
               << "BC: " << std::setw(4) << (int)get_doublereg(REG_B, REG_C) << std::setw(0) << ",  "
@@ -356,7 +451,7 @@ void GameBoy::dump_state() const {
               << std::dec;
 }
 
-void GameBoy::dump_mem() const {
+void GameBoy::dump_mem(void) const {
     std::string prev_line = "";
     std::string line = "";
     bool starring = false;
@@ -381,7 +476,7 @@ void GameBoy::dump_mem() const {
     std::cout << TOTAL_RAM << std::endl << std::dec << std::setw(0);
 }
 
-void GameBoy::dump_screen() const {
+void GameBoy::dump_screen(void) const {
     for (uint16_t r = 0; r < GB_SCREEN_HEIGHT; r++) {
         for (uint16_t c = 0; c < GB_SCREEN_WIDTH; c++) {
             std::cout << (screen[r * GB_SCREEN_WIDTH + c] ? "X" : "O");
@@ -802,7 +897,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11111110) { // CP n
-        std::cerr << "CP n (n = " << n8 << ")\n";
+        std::cerr << "CP n (n = " << std::hex << "0x" << (int)n8  << std::dec << ")\n";
         uint8_t const a = get_register8(REG_A);
         set_flag(FL_C, detect_borrow(a, n8, 8));
         set_flag(FL_H, detect_borrow(a, n8, 4));

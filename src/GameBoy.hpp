@@ -38,6 +38,7 @@
 #define LYC 0xFF45
 #define DMA_START 0xFF46
 #define WY 0xFF4A
+#define WX 0xFF4B
 
 #define JOYPAD_PORT 0xFF00
 #define INTERRUPT_FLAGS 0xFF0F
@@ -78,6 +79,13 @@ enum JoypadMode {
     BUTTONS = 1,
 };
 
+enum GraphicsMode {
+    HBLANK = 0,
+    VBLANK = 1,
+    SEARCHING = 2,
+    TRANSFERRING = 3,
+};
+
 class GameBoy {
 public: // change to private when done debugging
     std::uint16_t pc = HEADER_OFFSET;
@@ -89,14 +97,17 @@ public: // change to private when done debugging
     std::uint64_t cycles_to_wait = 0;
     std::uint64_t cycle_count = 0;
 
+    std::uint32_t dot_count = 0;
+    GraphicsMode graphics_mode = SEARCHING;
+
     bool screen[GB_SCREEN_WIDTH * GB_SCREEN_HEIGHT] = {0}; // We render everything to here.
 
-    GameBoy();
+    GameBoy(void);
     void load_rom(std::string romfile);
-    void wait();
-    void handle_interrupts();
+    void wait(void);
+    void handle_interrupts(void);
 
-    std::uint8_t read_joypad() const;
+    std::uint8_t read_joypad(void) const;
     std::uint8_t read_mem8(std::uint16_t addr) const;
     std::uint16_t read_mem16(std::uint16_t addr) const;
     void write_mem8(std::uint16_t addr, std::uint8_t val);
@@ -108,9 +119,14 @@ public: // change to private when done debugging
     void set_flag(Flag flag, bool val);
     bool get_flag(Flag flag) const;
     void do_dma(uint8_t const start_address);
+    void enter_vblank(void);
+    void enter_hblank(void);
+    void enter_searching(void);
+    void enter_transferring(void);
+    void update_screen(void);
 
     int execute_instruction(std::uint16_t addr);
-    void dump_state() const;
-    void dump_mem() const;
-    void dump_screen() const;
+    void dump_state(void) const;
+    void dump_mem(void) const;
+    void dump_screen(void) const;
 };

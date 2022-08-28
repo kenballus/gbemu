@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
     args.erase("--headless");
 
     if (args.size() != 1) {
-        std::cerr << "Usage: ./gbemu [--headless] <ROM>\n";
+        std::cerr << "Usage: " << argv[0] << " [--headless] <ROM>\n";
         return 1;
     }
     gb.load_rom(*args.cbegin());
