@@ -15,13 +15,13 @@ all: $(BINARY) $(TEST).gb
 
 # Compile the target
 $(BINARY): $(OBJ) $(MAIN)
-#	clang-format -i -style=file $(MAIN)
+	clang-format -i -style=file $(MAIN)
 	$(CPP) $(LINKERFLAGS) $(CPPFLAGS) $^ -o $@
 
 # Compile all the object files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(SRC_DIR)/%.hpp
 	mkdir -p $(OBJ_DIR)
-# 	clang-format -i -style=file $<
+	clang-format -i -style=file $<
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
 .PHONY: clean
@@ -30,8 +30,8 @@ clean:
 	rm -f $(TEST)/$(TEST).o
 	rm -f $(TEST).gb
 
-$(TEST)/$(TEST).o: $(TEST)/$(TEST).asm
-	rgbasm -L -o $(TEST)/$(TEST).o $(TEST)/$(TEST).asm
+$(OBJ_DIR)/$(TEST).o: $(TEST)/$(TEST).asm
+	rgbasm -L -o $(OBJ_DIR)/$(TEST).o $(TEST)/$(TEST).asm
 
-$(TEST).gb: $(TEST)/$(TEST).o
-	rgblink -o $(TEST).gb $(TEST)/$(TEST).o
+$(TEST).gb: $(OBJ_DIR)/$(TEST).o
+	rgblink -o $(TEST).gb $(OBJ_DIR)/$(TEST).o

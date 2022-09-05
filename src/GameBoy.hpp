@@ -3,55 +3,72 @@
 #include <cstdint>
 #include <fstream>
 
-#define GB_SCREEN_WIDTH 160
-#define GB_SCREEN_HEIGHT 144
-#define NUM_REGISTERS 8
-#define TOTAL_RAM 0xFFFF
+// #define DEBUG(X)
+#define DEBUG(x) do { std::cerr << x; } while (0)
+#define DEBUGPPU(x)
+// #define DEBUGPPU(x) do { std::cerr << "[PPU] " << x; } while (0)
 
-#define IVT_OFFSET 0x0000
-#define HEADER_OFFSET 0x0100
-#define ROM_BANK_0 0x0150
-#define ROM_BANK_1 0x4000
-#define CHARACTER_RAM 0x8000
-#define BG_MAP_DATA_1 0x9800
-#define BG_MAP_DATA_2 0x9C00
-#define CARTRIDGE_RAM 0xA000
-#define WRAM 0xC000
-#define ECHO_RAM 0xE000
-#define OAM 0xFE00
-#define UNUSED_ADDRESSES 0xFEA0
-#define IO_REGS 0xFF00
-#define FAST_RAM 0xFF80
-#define INTERRUPT_ENABLE 0xFFFF
+uint64_t const GB_SCREEN_WIDTH = 160;
+uint64_t const GB_SCREEN_HEIGHT = 144;
+uint64_t const NUM_REGISTERS = 8;
+uint16_t const TOTAL_RAM = 0xFFFF;
 
-#define VBLANK_INTERRUPT_ADDRESS 0x0040
-#define LCD_STAT_INTERRUPT_ADDRESS 0x0048
-#define TIMER_INTERRUPT_ADDRESS 0x0050
-#define SERIAL_INTERRUPT_ADDRESS 0x0058
-#define JOYPAD_INTERRUPT_ADDRESS 0x0060
+uint16_t const IVT_OFFSET = 0x0000;
+uint16_t const HEADER_OFFSET = 0x0100;
+uint16_t const ROM_BANK_0 = 0x0150;
+uint16_t const ROM_BANK_1 = 0x4000;
+// This is where tiles live:
+uint16_t const UNSIGNED_TILE_DATA_BASE = 0x8000;
+uint16_t const SIGNED_TILE_DATA_BASE = 0x9000;
+// This is where tile maps live:
+uint16_t const BG_MAP_DATA_1 = 0x9800;
+uint16_t const BG_MAP_DATA_2 = 0x9C00;
+uint16_t const CARTRIDGE_RAM = 0xA000;
+uint16_t const WRAM = 0xC000;
+uint16_t const ECHO_RAM = 0xE000;
+uint16_t const OAM = 0xFE00;
+uint16_t const UNUSED_ADDRESSES = 0xFEA0;
+uint16_t const IO_REGS = 0xFF00;
+uint16_t const FAST_RAM = 0xFF80;
+uint16_t const INTERRUPT_ENABLE = 0xFFFF;
 
-#define LCD_CONTROL 0xFF40
-#define LCD_STATUS 0xFF41
-#define SCY 0xFF42
-#define SCX 0xFF43
-#define LY 0xFF44
-#define LYC 0xFF45
-#define DMA_START 0xFF46
-#define WY 0xFF4A
-#define WX 0xFF4B
+uint16_t const VBLANK_INTERRUPT_ADDRESS = 0x0040;
+uint16_t const LCD_STAT_INTERRUPT_ADDRESS = 0x0048;
+uint16_t const TIMER_INTERRUPT_ADDRESS = 0x0050;
+uint16_t const SERIAL_INTERRUPT_ADDRESS = 0x0058;
+uint16_t const JOYPAD_INTERRUPT_ADDRESS = 0x0060;
 
-#define JOYPAD_PORT 0xFF00
-#define INTERRUPT_FLAGS 0xFF0F
-#define DIVIDER_REGISTER 0xFF04
-#define TIMA 0xFF05
-#define TMA 0xFF06
-#define TAC 0xFF07
+uint16_t const LCD_CONTROL = 0xFF40;
+uint16_t const LCD_STATUS = 0xFF41;
+uint16_t const SCY = 0xFF42;
+uint16_t const SCX = 0xFF43;
+uint16_t const LY = 0xFF44;
+uint16_t const LYC = 0xFF45;
+uint16_t const OAM_DMA_START = 0xFF46;
+uint16_t const BGP = 0xFF47;
+uint16_t const WY = 0xFF4A;
+uint16_t const WX = 0xFF4B;
 
+uint16_t const JOYPAD_PORT = 0xFF00;
+uint16_t const INTERRUPT_FLAGS = 0xFF0F;
+uint16_t const DIVIDER_REGISTER = 0xFF04;
+uint16_t const TIMA = 0xFF05;
+uint16_t const TMA = 0xFF06;
+uint16_t const TAC = 0xFF07;
+
+uint64_t const BG_MAP_WIDTH = 32; // Tiles
+uint64_t const BG_MAP_HEIGHT = 32; // Tiles
+uint64_t const TILE_WIDTH = 8; // Pixels
+uint64_t const BYTES_PER_TILE = 0x10;
+uint64_t const BG_MAP_SIZE = 0x400;
 // The true clock speed is 4x this, but every instruction takes a multiple of 4 cycles so we're dividing everything by 4
-#define CLOCK_SPEED 1048576
-#define DIVIDER_REGISTER_RATE 16384
+uint64_t const CLOCK_SPEED = 1048576;
+uint64_t const DIVIDER_REGISTER_RATE = 16384;
 // So we do (our) clock 64 times for each increment of the divider:
-#define CLOCKS_PER_DIVIDER_INCREMENT 64
+uint64_t const CLOCKS_PER_DIVIDER_INCREMENT = 64;
+
+// 16 ms/frame gets us a little over 60 fps
+uint64_t const MS_PER_CYCLE = 100;
 
 enum Register8 {
     REG_B = 0b000,
@@ -100,7 +117,9 @@ public: // change to private when done debugging
     std::uint32_t dot_count = 0;
     GraphicsMode graphics_mode = SEARCHING;
 
-    bool screen[GB_SCREEN_WIDTH * GB_SCREEN_HEIGHT] = {0}; // We render everything to here.
+    bool paused = false;
+
+    uint8_t screen[GB_SCREEN_HEIGHT][GB_SCREEN_WIDTH]; // We render everything to here.
 
     GameBoy(void);
     void load_rom(std::string romfile);
@@ -124,9 +143,12 @@ public: // change to private when done debugging
     void enter_searching(void);
     void enter_transferring(void);
     void update_screen(void);
+    void render_background(void);
+    void write_tile_to_screen(uint8_t, uint8_t, uint16_t);
 
     int execute_instruction(std::uint16_t addr);
     void dump_state(void) const;
     void dump_mem(void) const;
     void dump_screen(void) const;
+    void toggle_pause(void);
 };

@@ -1,4 +1,5 @@
 #include <chrono>
+#include <csignal>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -17,12 +18,21 @@ pixel_t color_light_grey;
 pixel_t color_dark_grey;
 pixel_t color_black;
 
+GameBoy* global_gb;
+
 void error_out(std::string my_error = "") {
     if (my_error != "") {
         std::cout << "My error: " << my_error << std::endl;
     }
     std::cout << "SDL Error: " << SDL_GetError() << std::endl;
     exit(1);
+}
+
+void sigint_handler(int) {
+    global_gb->dump_screen();
+    global_gb->dump_mem();
+    global_gb->dump_state();
+    global_gb->toggle_pause();
 }
 
 void init(SDL_Window*& window, SDL_Renderer*& renderer, SDL_Texture*& gb_screen) {
@@ -84,17 +94,21 @@ void update_gb_screen(GameBoy const& gb, SDL_Texture* gb_screen, SDL_Renderer* r
     pixel_t* pixels = (pixel_t*)raw_pixels;
     for (size_t r = 0; r < GB_SCREEN_HEIGHT; r++) {
         for (size_t c = 0; c < GB_SCREEN_WIDTH; c++) {
-            uint8_t color_bits = gb.screen[r * GB_SCREEN_WIDTH + c];
+            uint8_t color_bits = gb.screen[r][c];
             pixel_t pixel_color;
             switch (color_bits) {
                 case 0b00:
                     pixel_color = color_white;
+                    break;
                 case 0b01:
                     pixel_color = color_light_grey;
+                    break;
                 case 0b10:
                     pixel_color = color_dark_grey;
+                    break;
                 case 0b11:
                     pixel_color = color_black;
+                    break;
             }
             pixels[r * GB_SCREEN_WIDTH + c] = pixel_color;
         }
@@ -108,9 +122,12 @@ void update_gb_screen(GameBoy const& gb, SDL_Texture* gb_screen, SDL_Renderer* r
 
 int main(int argc, char* argv[]) {
     auto gb = GameBoy();
+    global_gb = &gb;
 
     std::unordered_set<std::string> args;
-    for (int i = 1; i < argc; i++) { args.insert(argv[i]); }
+    for (int i = 1; i < argc; i++) {
+        args.insert(argv[i]);
+    }
 
     bool headless = args.contains("--headless");
     args.erase("--headless");
@@ -124,12 +141,14 @@ int main(int argc, char* argv[]) {
     SDL_Window* window = NULL;
     SDL_Renderer* renderer = NULL;
     SDL_Texture* gb_screen = NULL;
-    if (not headless) {
+    if (!headless) {
         init(window, renderer, gb_screen);
     }
 
+    std::signal(SIGINT, sigint_handler);
+
     while (true) {
-        if (not headless) {
+        if (!headless) {
             update_gb_screen(gb, gb_screen, renderer, window);
 
             SDL_Event event;
@@ -138,17 +157,29 @@ int main(int argc, char* argv[]) {
                     goto done;
                 }
             }
+            if (event.type == SDL_KEYDOWN) {
+                // Only do something if there's a keyboard input.
+                // This allows for single stepping.
+                // auto ret = gb.execute_instruction(gb.pc);
+                // if (ret != 0) {
+                //     goto done;
+                // }
+                // gb.wait();
+            }
         }
         auto ret = gb.execute_instruction(gb.pc);
         if (ret != 0) {
-            gb.dump_state();
-            gb.dump_mem();
-            break;
+            goto done;
         }
         gb.wait();
     }
+
 done:
+    gb.dump_screen();
+    gb.dump_mem();
+    gb.dump_state();
 
     deinit(window, renderer, gb_screen);
+    error_out("Finished execution.");
     return 0;
 }
