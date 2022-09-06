@@ -55,10 +55,23 @@ start:
 	or a, b
 	ld [hl], a
 
+	ld hl, $FF43 ; SCX
+loop_top:
+	ld a, $10 ; Time to spin
 loop:
-	call doodad
-	jp loop
+	dec a
+	jr NZ, loop
 
-doodad:
-	inc a
-	ret
+	ld a, [hl]
+	and a
+	jr NZ, zero_it
+
+	ld a, $4
+	ld [hld], a
+	ld [hli], a
+	jp loop_top
+zero_it:
+	ld a, $0
+	ld [hld], a
+	ld [hli], a
+	jp loop_top

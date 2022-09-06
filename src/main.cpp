@@ -22,9 +22,9 @@ GameBoy* global_gb;
 
 void error_out(std::string my_error = "") {
     if (my_error != "") {
-        std::cout << "My error: " << my_error << std::endl;
+        std::cerr << "My error: " << my_error << std::endl;
     }
-    std::cout << "SDL Error: " << SDL_GetError() << std::endl;
+    std::cerr << "SDL Error: " << SDL_GetError() << std::endl;
     exit(1);
 }
 
@@ -32,7 +32,7 @@ void sigint_handler(int) {
     global_gb->dump_screen();
     global_gb->dump_mem();
     global_gb->dump_state();
-    global_gb->toggle_pause();
+    exit(1);
 }
 
 void init(SDL_Window*& window, SDL_Renderer*& renderer, SDL_Texture*& gb_screen) {
@@ -129,8 +129,10 @@ int main(int argc, char* argv[]) {
         args.insert(argv[i]);
     }
 
-    bool headless = args.contains("--headless");
+    bool const headless = args.contains("--headless");
     args.erase("--headless");
+    gb.paused = args.contains("--freeze");
+    args.erase("--freeze");
 
     if (args.size() != 1) {
         std::cerr << "Usage: " << argv[0] << " [--headless] <ROM>\n";
@@ -147,37 +149,41 @@ int main(int argc, char* argv[]) {
 
     std::signal(SIGINT, sigint_handler);
 
+    uint8_t counter = 0;
     while (true) {
         if (!headless) {
-            update_gb_screen(gb, gb_screen, renderer, window);
-
+            if (counter == 0) {
+                update_gb_screen(gb, gb_screen, renderer, window);
+            }
             SDL_Event event;
             while (SDL_PollEvent(&event)) {  // While there are events to process
                 if (event.type == SDL_QUIT) {
                     goto done;
                 }
-            }
-            if (event.type == SDL_KEYDOWN) {
-                // Only do something if there's a keyboard input.
-                // This allows for single stepping.
-                // auto ret = gb.execute_instruction(gb.pc);
-                // if (ret != 0) {
-                //     goto done;
-                // }
-                // gb.wait();
+
+                if (event.type == SDL_KEYDOWN) {
+                    if (event.key.keysym.sym == SDLK_RETURN) {
+                        gb.toggle_pause();
+                    } else if (event.key.keysym.sym == SDLK_s) {
+                        gb.paused = false;
+                        gb.execute_instruction(gb.pc);
+                        gb.paused = true;
+                    } else if (event.key.keysym.sym == SDLK_d) {
+                        gb.dump_state();
+                    }
+                }
             }
         }
-        auto ret = gb.execute_instruction(gb.pc);
-        if (ret != 0) {
-            goto done;
-        }
+        gb.execute_instruction(gb.pc);
         gb.wait();
+
+        counter++;
     }
 
 done:
-    gb.dump_screen();
-    gb.dump_mem();
-    gb.dump_state();
+    // gb.dump_screen();
+    // gb.dump_mem();
+    // gb.dump_state();
 
     deinit(window, renderer, gb_screen);
     error_out("Finished execution.");

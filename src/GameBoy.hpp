@@ -3,8 +3,9 @@
 #include <cstdint>
 #include <fstream>
 
-// #define DEBUG(X)
-#define DEBUG(x) do { std::cerr << x; } while (0)
+#define DEBUG_LEVEL 1
+// #define DEBUG(lvl, str)
+#define DEBUG(lvl, str) do { if (lvl <= DEBUG_LEVEL) std::cerr << str; } while (0)
 #define DEBUGPPU(x)
 // #define DEBUGPPU(x) do { std::cerr << "[PPU] " << x; } while (0)
 
@@ -50,6 +51,7 @@ uint16_t const WY = 0xFF4A;
 uint16_t const WX = 0xFF4B;
 
 uint16_t const JOYPAD_PORT = 0xFF00;
+uint16_t const SERIAL_PORT = 0xFF01;
 uint16_t const INTERRUPT_FLAGS = 0xFF0F;
 uint16_t const DIVIDER_REGISTER = 0xFF04;
 uint16_t const TIMA = 0xFF05;

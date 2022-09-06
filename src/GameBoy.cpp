@@ -55,6 +55,21 @@ std::string stringify_dd_doublereg(uint8_t doublereg_bits) {
     exit(1);
 }
 
+std::string stringify_qq_doublereg(uint8_t doublereg_bits) {
+    switch (doublereg_bits) {  // Don't need breaks if I only return
+        case 0b00:
+            return "BC";
+        case 0b01:
+            return "DE";
+        case 0b10:
+            return "HL";
+        case 0b11:
+            return "AF";
+    }
+    std::cerr << std::bitset<8>{doublereg_bits} << " is not a dd doublereg." << std::endl;
+    exit(1);
+}
+
 std::string stringify_flag(Flag flag) {
     switch (flag) {
         case FL_C:
@@ -109,11 +124,11 @@ bool detect_borrow(uint32_t a, uint32_t b, uint8_t bit) {
 }
 
 GameBoy::GameBoy(void) {
-    DEBUG("Bringin' her up!\n");
-    set_doublereg(REG_A, REG_F, 0x01B0);
-    set_doublereg(REG_B, REG_C, 0x0013);
-    set_doublereg(REG_D, REG_E, 0x00D8);
-    set_doublereg(REG_H, REG_L, 0x014D);
+    DEBUG(1, "Bringin' her up!\n");
+    set_doublereg(REG_A, REG_F, 0x0100);
+    set_doublereg(REG_B, REG_C, 0xFF13);
+    set_doublereg(REG_D, REG_E, 0x00C1);
+    set_doublereg(REG_H, REG_L, 0x8403);
     set_doublereg(REG_S, REG_P, 0xFFFE);
     write_mem8(TIMA, 0x00);
     write_mem8(TMA, 0x00);
@@ -167,7 +182,7 @@ void GameBoy::load_rom(std::string romfile) {
         ifs.read((char*)ram, size);
         ifs.close();
     } else {
-        DEBUG("Unable to open ROM.");
+        DEBUG(1, "Unable to open ROM.");
     }
 }
 
@@ -178,7 +193,7 @@ void GameBoy::wait(void) {
         cycle_count += 1;
         cycles_to_wait -= 1;
         if (cycle_count % CLOCKS_PER_DIVIDER_INCREMENT == 0) {
-            DEBUG("    Resetting the divider register!\n");
+            DEBUG(2, "\tResetting the divider register!\n");
             write_mem8(DIVIDER_REGISTER, read_mem8(DIVIDER_REGISTER + 1));
         }
 
@@ -292,8 +307,10 @@ void GameBoy::handle_interrupts(void) {
 }
 
 void GameBoy::write_mem8(uint16_t addr, uint8_t val) {
-    DEBUG("\tWriting " << std::hex << "0x" << std::setw(2) << std::setfill('0') << (int)val << std::setw(0)
-                       << " to address 0x" << addr << std::dec << "\n");
+    if (read_mem8(addr) != val) {
+        DEBUG(2, "\tWriting " << std::hex << "0x" << std::setw(2) << std::setfill('0') << (int64_t)val << std::setw(0)
+                              << " to address 0x" << addr << std::dec << "\n");
+    }
     if (addr == DIVIDER_REGISTER) {
         ram[addr] = 0x00;  // See page 25 of the Nintendo programming docs for why
     } else if (addr == JOYPAD_PORT) {
@@ -313,15 +330,18 @@ void GameBoy::write_mem8(uint16_t addr, uint8_t val) {
         ram[addr] = val;
     } else if (addr == OAM_DMA_START) {
         do_dma(val);
+    } else if (addr == SERIAL_PORT) {
+        // std::cout << "[SERIAL] 0x" << std::hex << (int64_t)val << std::dec << std::endl;
+        std::cout << (char)val;
     } else if (is_writable(addr)) {
         ram[addr] = val;
     } else if (0x2000 <= addr && addr <= 0x5FFF) {
         std::cerr << "Attempted bank switch, which is not implemented.\n";
-        // exit(1);
-    } else {
-        std::cerr << "Attempted illegal write of " << std::hex << (int)val << " to address 0x" << (int)addr << std::dec
-                  << "\n";
         exit(1);
+    } else {
+        std::cerr << "Attempted illegal write of " << std::hex << (int64_t)val << " to address 0x" << (int64_t)addr
+                  << std::dec << "\n";
+        // exit(1);
     }
 }
 
@@ -333,8 +353,8 @@ void GameBoy::write_mem16(uint16_t addr, uint16_t val) {
 
 void GameBoy::set_register8(Register8 const r8, uint8_t const u8) {
     registers[r8] = u8;
-    DEBUG("\tSetting register " << stringify_reg(r8) << " to " << std::hex << "0x" << std::setw(2) << std::setfill('0')
-                                << (int)u8 << std::setw(0) << std::dec << std::endl);
+    DEBUG(2, "\tSetting register " << stringify_reg(r8) << " to " << std::hex << "0x" << std::setw(2)
+                                   << std::setfill('0') << (int64_t)u8 << std::setw(0) << std::dec << std::endl);
 }
 
 uint8_t GameBoy::get_register8(Register8 r8) const { return registers[r8]; }
@@ -349,7 +369,7 @@ uint16_t GameBoy::get_doublereg(Register8 r8_1, Register8 r8_2) const {
 }
 
 void GameBoy::set_flag(Flag flag, bool val) {
-    DEBUG("\tSetting flag " << stringify_flag(flag) << " to " << val << "\n");
+    DEBUG(2, "\tSetting flag " << stringify_flag(flag) << " to " << val << "\n");
     registers[REG_F] = (get_register8(REG_F) & ~flag) | (flag * val);
 }
 
@@ -367,7 +387,7 @@ void GameBoy::enter_hblank(void) {
     // Write down the current graphics mode
     ram[LCD_STATUS] = (read_mem8(LCD_STATUS) & 0b11111100) + 0b00;
     // Mark that vblank interrupts cannot happen now
-    write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) & 0b11111110);
+    write_mem8(INTERRUPT_ENABLE, read_mem8(INTERRUPT_ENABLE) & 0b11111110);
 
     graphics_mode = HBLANK;
 }
@@ -377,7 +397,7 @@ void GameBoy::enter_vblank(void) {
     // Write down the current graphics mode
     ram[LCD_STATUS] = (read_mem8(LCD_STATUS) & 0b11111100) + 0b01;
     // Mark that vblank interrupts can happen now
-    write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) | 0b00000001);
+    write_mem8(INTERRUPT_ENABLE, read_mem8(INTERRUPT_ENABLE) | 0b00000001);
 
     graphics_mode = VBLANK;
 }
@@ -387,7 +407,7 @@ void GameBoy::enter_searching(void) {
     // Write down the current graphics mode
     ram[LCD_STATUS] = (read_mem8(LCD_STATUS) & 0b11111100) + 0b10;
     // Mark that vblank interrupts cannot happen now
-    write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) & 0b11111110);
+    write_mem8(INTERRUPT_ENABLE, read_mem8(INTERRUPT_ENABLE) & 0b11111110);
 
     graphics_mode = SEARCHING;
 }
@@ -397,7 +417,7 @@ void GameBoy::enter_transferring(void) {
     // Write down the current graphics mode
     ram[LCD_STATUS] = (read_mem8(LCD_STATUS) & 0b11111100) + 0b11;
     // Mark that vblank interrupts cannot happen now
-    write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) & 0b11111110);
+    write_mem8(INTERRUPT_ENABLE, read_mem8(INTERRUPT_ENABLE) & 0b11111110);
 
     graphics_mode = TRANSFERRING;
 }
@@ -412,9 +432,9 @@ void GameBoy::write_tile_to_screen(uint8_t r, uint8_t c, uint16_t tile_address) 
         uint16_t const tile_data = (tile_data_hi << 8) | tile_data_lo;
 
         for (uint8_t j = 0; j < 8; j++) {  // For each pixel in the row,
-            uint16_t const y = r + i;
-            uint16_t const x = c + j;
-            if (y < GB_SCREEN_HEIGHT && x < GB_SCREEN_WIDTH) {
+            int16_t const y = r + i - read_mem8(SCY);
+            int16_t const x = c + j - read_mem8(SCX);
+            if (0 <= y && y < GB_SCREEN_HEIGHT && 0 <= x && x < GB_SCREEN_WIDTH) {
                 uint8_t const color = ((tile_data >> (14 - j)) & 0b10) + ((tile_data >> (7 - j)) & 0b1);
                 screen[y][x] = color;
             }
@@ -444,13 +464,16 @@ void GameBoy::update_screen(void) {
     dot_count %= 70224;  // It takes 70224 dots to do one frame
 
     // Update the current line number
-    if (dot_count % 456 == 0) {
-        write_mem8(LY, dot_count / 456);
-    }
+    write_mem8(LY, dot_count / 456);
 
     if (dot_count >= 65664) {  // vblank
         if (graphics_mode != VBLANK) {
             enter_vblank();
+            // Draw the whole background at once upon entering vblank
+            // The real thing does it line by line as it goes, but this is easier
+            if (read_mem8(LCD_CONTROL) & 0b1) {
+                render_background();
+            }
         }
     } else if (dot_count % 456 >= 248) {  // hblank (not yet allowing mode 3 extension)
         if (graphics_mode != HBLANK) {
@@ -465,19 +488,15 @@ void GameBoy::update_screen(void) {
             enter_searching();
         }
     }
-
-    if (read_mem8(LCD_CONTROL) & 0b1) {
-        render_background();
-    }
 }
 
 void GameBoy::dump_state(void) const {
     std::cout << std::setfill('0') << std::uppercase << std::hex << "AF: " << std::setw(4)
-              << (int)get_doublereg(REG_A, REG_F) << std::setw(0) << ",  "
-              << "BC: " << std::setw(4) << (int)get_doublereg(REG_B, REG_C) << std::setw(0) << ",  "
-              << "DE: " << std::setw(4) << (int)get_doublereg(REG_D, REG_E) << std::setw(0) << ",  "
-              << "HL: " << std::setw(4) << (int)get_doublereg(REG_H, REG_L) << std::setw(0) << ",  "
-              << "SP: " << std::setw(4) << (int)get_doublereg(REG_S, REG_P) << std::setw(0) << ",  "
+              << (int64_t)get_doublereg(REG_A, REG_F) << std::setw(0) << ",  "
+              << "BC: " << std::setw(4) << (int64_t)get_doublereg(REG_B, REG_C) << std::setw(0) << ",  "
+              << "DE: " << std::setw(4) << (int64_t)get_doublereg(REG_D, REG_E) << std::setw(0) << ",  "
+              << "HL: " << std::setw(4) << (int64_t)get_doublereg(REG_H, REG_L) << std::setw(0) << ",  "
+              << "SP: " << std::setw(4) << (int64_t)get_doublereg(REG_S, REG_P) << std::setw(0) << ",  "
               << "PC: " << std::setw(4) << pc << std::setw(0) << "  \n"
               << "Z:  " << get_flag(FL_Z) << ",     "
               << "N:  " << get_flag(FL_N) << ",     "
@@ -494,7 +513,8 @@ void GameBoy::dump_mem(void) const {
     ss << std::setfill('0') << std::uppercase << std::hex;
 
     for (uint32_t i = 0; i < TOTAL_RAM; i++) {
-        ss << std::setw(2) << (int)read_mem8(i) << std::setw(0) << (i % 16 == 7 ? "  " : (i % 16 == 15 ? "\n" : " "));
+        ss << std::setw(2) << (int64_t)read_mem8(i) << std::setw(0)
+           << (i % 16 == 7 ? "  " : (i % 16 == 15 ? "\n" : " "));
         if (i % 16 == 15) {
             prev_line = line;
             line = ss.str();
@@ -590,123 +610,122 @@ int GameBoy::execute_instruction(uint16_t addr) {
     uint8_t cc = (instruction >> 3) & 0b11;
     uint16_t const n16 = read_mem16(addr + 1);
 
-    DEBUG("0x" << std::hex << (int)pc << ": "
-               << "Executing instruction 0x" << std::setfill('0') << std::setw(2) << (int)instruction << std::setw(0)
-               << " " << std::dec << "(0b" << std::bitset<8>{instruction} << ")"
-               << ": ");
+    DEBUG(1, "0x" << std::hex << (int64_t)pc << ": ");
+    // << "Executing instruction 0x" << std::setfill('0') << std::setw(2) << (int64_t)instruction << std::setw(0)
+    // << " " << std::dec << "(0b" << std::bitset<8>{instruction} << ")"
+    // << ": ");
 
     if (top_two == 0b01 && r8_1 != DUMMY && r8_2 != DUMMY) {  // LD r, r'
-        DEBUG("LD " << stringify_reg(r8_1) << ", " << stringify_reg(r8_2) << " \n");
+        DEBUG(1, "LD " << stringify_reg(r8_1) << ", " << stringify_reg(r8_2) << " \n");
         set_register8(r8_1, get_register8(r8_2));
         cycles_to_wait += 1;
         pc += 1;
     } else if (top_two == 0b00 && r8_1 != DUMMY && bottom_three == 0b110) {  // LD r, n
-        DEBUG("LD r, n (r = " << stringify_reg(r8_1) << ", n = 0x" << std::hex << (int)n8 << std::dec << ")\n");
+        DEBUG(1, "LD " << stringify_reg(r8_1) << ", 0x" << std::hex << (int64_t)n8 << std::dec << "\n");
         set_register8(r8_1, n8);
         cycles_to_wait += 2;
         pc += 2;
     } else if (top_two == 0b01 && r8_1 != DUMMY && bottom_three == 0b110) {  // LD r, (HL)
-        DEBUG("LD r, (HL)\n");
+        DEBUG(1, "LD r, (HL)\n");
         set_register8(r8_1, read_mem8(get_doublereg(REG_H, REG_L)));
         cycles_to_wait += 2;
         pc += 1;
     } else if (top_five == 0b01110 && r8_2 != DUMMY) {  // LD (HL), r
-        DEBUG("LD (HL), r\n");
+        DEBUG(1, "LD (HL), " << stringify_reg(r8_2) << "\n");
         write_mem8(get_doublereg(REG_H, REG_L), get_register8(r8_2));
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b00110110) {  // LD (HL), n
-        DEBUG("LD (HL), n\n");
+        DEBUG(1, "LD (HL), 0x" << std::hex << (int64_t)n8 << std::dec << "\n");
         write_mem8(get_doublereg(REG_H, REG_L), n8);
         cycles_to_wait += 3;
         pc += 2;
     } else if (instruction == 0b00001010) {  // LD A, (BC)
-        DEBUG("LD A, (BC)\n");
+        DEBUG(1, "LD A, (BC)\n");
         set_register8(REG_A, read_mem8(get_doublereg(REG_B, REG_C)));
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b00011010) {  // LD A, (DE)
-        DEBUG("LD A, (DE)\n");
+        DEBUG(1, "LD A, (DE)\n");
         set_register8(REG_A, read_mem8(get_doublereg(REG_D, REG_E)));
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b11110010) {  // LD A, (C)
-        DEBUG("LD A, (C)\n");
+        DEBUG(1, "LD A, (C)\n");
         set_register8(REG_A, read_mem8(0xFF00 + get_register8(REG_C)));
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b11100010) {  // LD (C), A
-        DEBUG("LD (C), A\n");
+        DEBUG(1, "LD (C), A\n");
         write_mem8(0xFF00 + get_register8(REG_C), get_register8(REG_A));
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b11110000) {  // LD A, (n)
-        DEBUG("LD A, (n) (n = 0x" << std::hex << (int)n8 << std::dec << ")\n");
+        DEBUG(1, "LD A, (0x" << std::hex << 0xFF00 + n8 << std::dec << ")\n");
         set_register8(REG_A, read_mem8(0xFF00 + n8));
         cycles_to_wait += 3;
         pc += 2;
     } else if (instruction == 0b11100000) {  // LD (n), A
-        DEBUG("LD (n), A\n");
+        DEBUG(1, "LD (0x" << std::hex << 0xFF00 + n8 << std::dec << "), A\n");
         write_mem8(0xFF00 + n8, get_register8(REG_A));
         cycles_to_wait += 3;
         pc += 2;
     } else if (instruction == 0b11111010) {  // LD A, (nn)
-        DEBUG("LD A, (nn)\n");
+        DEBUG(1, "LD A, (0x" << std::hex << n16 << std::dec << ")\n");
         set_register8(REG_A, read_mem8(n16));
         cycles_to_wait += 4;
         pc += 3;
     } else if (instruction == 0b11101010) {  // LD (nn), A
-        DEBUG("LD (nn), A\n");
+        DEBUG(1, "LD (0x" << std::hex << n16 << std::dec << "), A\n");
         write_mem8(n16, get_register8(REG_A));
         cycles_to_wait += 4;
         pc += 3;
     } else if (instruction == 0b00101010) {  // LD A, (HLI)
-        DEBUG("LD A, (HLI)\n");
+        DEBUG(1, "LD A, (HLI)\n");
         set_register8(REG_A, read_mem8(get_doublereg(REG_H, REG_L)));
         set_doublereg(REG_H, REG_L, get_doublereg(REG_H, REG_L) + 1);  // This should roll over automatically
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b00111010) {  // LD A, (HLD)
-        DEBUG("LD A, (HLD)\n");
+        DEBUG(1, "LD A, (HLD)\n");
         set_register8(REG_A, read_mem8(get_doublereg(REG_H, REG_L)));
         set_doublereg(REG_H, REG_L, get_doublereg(REG_H, REG_L) - 1);  // This should roll over automatically
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b00000010) {  // LD (BC), A
-        DEBUG("LD (BC), A\n");
+        DEBUG(1, "LD (BC), A\n");
         write_mem8(get_doublereg(REG_B, REG_C), get_register8(REG_A));
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b00010010) {  // LD (DE), A
-        DEBUG("LD (DE), A\n");
+        DEBUG(1, "LD (DE), A\n");
         write_mem8(get_doublereg(REG_D, REG_E), get_register8(REG_A));
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b00100010) {  // LD (HLI), A
-        DEBUG("LD (HLI), A\n");
+        DEBUG(1, "LD (HLI), A\n");
         write_mem8(get_doublereg(REG_H, REG_L), get_register8(REG_A));
         set_doublereg(REG_H, REG_L, get_doublereg(REG_H, REG_L) + 1);  // This should roll over automatically
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b00110010) {  // LD (HLD), A
-        DEBUG("LD (HLD), A\n");
+        DEBUG(1, "LD (HLD), A\n");
         write_mem8(get_doublereg(REG_H, REG_L), get_register8(REG_A));
         set_doublereg(REG_H, REG_L, get_doublereg(REG_H, REG_L) - 1);  // This should roll over automatically
         cycles_to_wait += 2;
         pc += 1;
     } else if ((instruction & 0b11001111) == 0b00000001) {  // LD dd, nn
-        DEBUG("LD dd, nn (dd = " << stringify_dd_doublereg(doublereg_bits) << ", nn = " << std::hex << "0x" << n16
-                                 << std::dec << ")\n");
+        DEBUG(1, "LD " << stringify_dd_doublereg(doublereg_bits) << ", 0x" << std::hex << n16 << std::dec << "\n");
         set_doublereg(d1, d2, n16);
         cycles_to_wait += 3;
         pc += 3;
     } else if (instruction == 0b11111001) {  // LD SP, HL
-        DEBUG("LD SP, HL\n");
+        DEBUG(1, "LD SP, HL\n");
         set_doublereg(REG_S, REG_P, get_doublereg(REG_H, REG_L));
         cycles_to_wait += 2;
         pc += 1;
     } else if ((instruction & 0b11001111) == 0b11000101) {  // PUSH qq
-        DEBUG("PUSH qq\n");
+        DEBUG(1, "PUSH " << stringify_qq_doublereg(doublereg_bits) << "\n");
         // These could be doublereg operations but it's easier to not think about it.
         write_mem8(get_doublereg(REG_S, REG_P) - 1, get_register8(q1));
         write_mem8(get_doublereg(REG_S, REG_P) - 2, get_register8(q2));
@@ -714,7 +733,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         pc += 1;
     } else if ((instruction & 0b11001111) == 0b11000001) {  // POP qq
-        DEBUG("POP qq\n");
+        DEBUG(1, "POP " << stringify_qq_doublereg(doublereg_bits) << "\n");
         // These could be doublereg operations but it's easier to not think about it.
         set_register8(q2, read_mem8(get_doublereg(REG_S, REG_P)));
         set_register8(q1, read_mem8(get_doublereg(REG_S, REG_P) + 1));
@@ -723,23 +742,23 @@ int GameBoy::execute_instruction(uint16_t addr) {
         pc += 1;
         // } else if (instruction == 0b11111000) { // LDHL SP, e
     } else if (instruction == 0b00001000) {  // LD (nn), SP
-        DEBUG("LD (nn), SP\n");
+        DEBUG(1, "LD (0x" << std::hex << n16 << std::dec << "), SP\n");
         write_mem16(n16, get_doublereg(REG_S, REG_P));
         cycles_to_wait += 5;
         pc += 3;
     } else if (top_five == 0b10000 && r8_2 != DUMMY) {  // ADD A, r
-        DEBUG("ADD A, r\n");
+        DEBUG(1, "ADD A, " << stringify_reg(r8_2) << "\n");
+        uint8_t const r_val = get_register8(r8_2);
         uint8_t const a = get_register8(REG_A);
-        uint8_t const r = get_register8(r8_2);
-        set_register8(REG_A, a + r);
-        set_flag(FL_C, detect_carry(a, r, 7));
-        set_flag(FL_H, detect_carry(a, r, 3));
+        set_register8(REG_A, a + r_val);
+        set_flag(FL_C, detect_carry(a, r_val, 7));
+        set_flag(FL_H, detect_carry(a, r_val, 3));
         set_flag(FL_N, 0);
         set_flag(FL_Z, get_register8(REG_A) == 0);
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11000110) {  // ADD A, n
-        DEBUG("ADD A, n\n");
+        DEBUG(1, "ADD A, 0x" << std::hex << (int64_t)n8 << std::dec << "\n");
         uint8_t const a = get_register8(REG_A);
         set_register8(REG_A, a + n8);
         set_flag(FL_C, detect_carry(a, n8, 7));
@@ -749,7 +768,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10000110) {  // ADD A, (HL)
-        DEBUG("ADD A, (HL)\n");
+        DEBUG(1, "ADD A, (HL)\n");
         uint8_t const hl_read = read_mem8(get_doublereg(REG_H, REG_L));
         uint8_t const a = get_register8(REG_A);
         set_register8(REG_A, a + hl_read);
@@ -760,19 +779,19 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 1;
     } else if (top_five == 0b10001 && r8_2 != DUMMY) {  // ADC A, r
-        DEBUG("ADC A, r\n");
+        DEBUG(1, "ADC A, " << stringify_reg(r8_2) << "\n");
         bool const old_fl_c = get_flag(FL_C);
         uint8_t const a = get_register8(REG_A);
-        uint8_t const r = get_register8(r8_2);
-        set_register8(REG_A, a + r + old_fl_c);
-        set_flag(FL_C, detect_carry(a, r, 7));
-        set_flag(FL_H, detect_carry(a, r, 3));
+        uint8_t const r_val = get_register8(r8_2);
+        set_register8(REG_A, a + r_val + old_fl_c);
+        set_flag(FL_C, detect_carry(a, r_val, 7));
+        set_flag(FL_H, detect_carry(a, r_val, 3));
         set_flag(FL_N, 0);
         set_flag(FL_Z, get_register8(REG_A) == 0);
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11001110) {  // ADC A, n
-        DEBUG("ADC A, n\n");
+        DEBUG(1, "ADC A, 0x" << std::hex << (int64_t)n8 << std::dec << "\n");
         bool const old_fl_c = get_flag(FL_C);
         uint8_t const a = get_register8(REG_A);
         set_register8(REG_A, a + n8 + old_fl_c);
@@ -783,7 +802,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10001110) {  // ADC A, (HL)
-        DEBUG("ADC A, (HL)\n");
+        DEBUG(1, "ADC A, (HL)\n");
         bool const old_fl_c = get_flag(FL_C);
         uint8_t const a = get_register8(REG_A);
         uint8_t const hl_read = read_mem8(get_doublereg(REG_H, REG_L));
@@ -795,7 +814,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 1;
     } else if (top_five == 0b10010 && r8_2 != DUMMY) {  // SUB r
-        DEBUG("SUB r\n");
+        DEBUG(1, "SUB " << stringify_reg(r8_2) << "\n");
         uint8_t const r = get_register8(r8_2);
         uint8_t const a = get_register8(REG_A);
         set_register8(REG_A, a - r);
@@ -806,7 +825,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11010110) {  // SUB n
-        DEBUG("SUB n\n");
+        DEBUG(1, "SUB A, 0x" << std::hex << (int64_t)n8 << std::dec << "\n");
         uint8_t const a = get_register8(REG_A);
         set_register8(REG_A, a - n8);
         set_flag(FL_C, detect_borrow(a, n8, 8));
@@ -816,7 +835,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10010110) {  // SUB (HL)
-        DEBUG("SUB (HL)\n");
+        DEBUG(1, "SUB (HL)\n");
         uint8_t const a = get_register8(REG_A);
         uint8_t const hl_read = read_mem8(get_doublereg(REG_H, REG_L));
         set_register8(REG_A, a - hl_read);
@@ -827,7 +846,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 1;
     } else if (top_five == 0b10011 && r8_2 != DUMMY) {  // SBC A, r
-        DEBUG("SBC A, r\n");
+        DEBUG(1, "SBC A, " << stringify_reg(r8_2) << "\n");
         bool const old_fl_c = get_flag(FL_C);
         uint8_t const a = get_register8(REG_A);
         uint8_t const r = get_register8(r8_2);
@@ -839,7 +858,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11011110) {  // SBC A, n
-        DEBUG("SBC A, n\n");
+        DEBUG(1, "SBC A, 0x" << std::hex << (int64_t)n8 << std::dec << "\n");
         bool const old_fl_c = get_flag(FL_C);
         uint8_t const a = get_register8(REG_A);
         set_register8(REG_A, a - n8 - old_fl_c);
@@ -850,7 +869,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10011110) {  // SBC A, (HL)
-        DEBUG("SBC A, n\n");
+        DEBUG(1, "SBC A, (HL)\n");
         bool const old_fl_c = get_flag(FL_C);
         uint8_t const a = get_register8(REG_A);
         uint8_t hl_read = read_mem8(get_doublereg(REG_H, REG_L));
@@ -862,7 +881,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 1;
     } else if (top_five == 0b10100 && r8_2 != DUMMY) {  // AND r
-        DEBUG("AND r\n");
+        DEBUG(1, "AND A, " << stringify_reg(r8_2) << "\n");
         set_register8(REG_A, get_register8(REG_A) & get_register8(r8_2));
         set_flag(FL_C, 0);
         set_flag(FL_H, 1);
@@ -871,7 +890,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11100110) {  // AND n
-        DEBUG("AND n\n");
+        DEBUG(1, "AND A, 0x" << std::hex << (int64_t)n8 << std::dec << "\n");
         set_register8(REG_A, get_register8(REG_A) & n8);
         set_flag(FL_C, 0);
         set_flag(FL_H, 1);
@@ -880,7 +899,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10100110) {  // AND (HL)
-        DEBUG("AND (HL)\n");
+        DEBUG(1, "AND (HL)\n");
         set_register8(REG_A, get_register8(REG_A) & read_mem8(get_doublereg(REG_H, REG_L)));
         set_flag(FL_C, 0);
         set_flag(FL_H, 1);
@@ -889,7 +908,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (top_five == 0b10110 && r8_2 != DUMMY) {  // OR r
-        DEBUG("OR A, " << stringify_reg(r8_2) << "\n");
+        DEBUG(1, "OR A, " << stringify_reg(r8_2) << "\n");
         uint8_t const a = get_register8(REG_A);
         uint8_t const r_val = get_register8(r8_2);
         set_register8(REG_A, a | r_val);
@@ -900,7 +919,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11110110) {  // OR n
-        DEBUG("OR n\n");
+        DEBUG(1, "OR A, 0x" << std::hex << (int64_t)n8 << std::dec << "\n");
         uint8_t const a = get_register8(REG_A);
         set_register8(REG_A, a | n8);
         set_flag(FL_Z, n8 == 0 && a == 0);  // a | b == 0 only when a == b == 0
@@ -910,7 +929,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10110110) {  // OR (HL)
-        DEBUG("OR (HL)\n");
+        DEBUG(1, "OR (HL)\n");
         uint8_t const hl_read = read_mem8(get_doublereg(REG_H, REG_L));
         uint8_t const a = get_register8(REG_A);
         set_register8(REG_A, a | hl_read);
@@ -921,7 +940,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 1;
     } else if (top_five == 0b10101 && r8_2 != DUMMY) {  // XOR r
-        DEBUG("XOR r (r = " << stringify_reg(r8_2) << ")\n");
+        DEBUG(1, "XOR " << stringify_reg(r8_2) << "\n");
         set_register8(REG_A, get_register8(REG_A) ^ get_register8(r8_2));
         set_flag(FL_C, 0);
         set_flag(FL_H, 0);
@@ -930,7 +949,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11101110) {  // XOR n
-        DEBUG("XOR n\n");
+        DEBUG(1, "XOR A, 0x" << std::hex << (int64_t)n8 << std::dec << "\n");
         set_register8(REG_A, get_register8(REG_A) ^ n8);
         set_flag(FL_C, 0);
         set_flag(FL_H, 0);
@@ -939,7 +958,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10101110) {  // XOR (HL)
-        DEBUG("XOR (HL)\n");
+        DEBUG(1, "XOR (HL)\n");
         set_register8(REG_A, get_register8(REG_A) ^ read_mem8(get_doublereg(REG_H, REG_L)));
         set_flag(FL_C, 0);
         set_flag(FL_H, 0);
@@ -948,7 +967,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 1;
     } else if (top_five == 0b10111 && r8_2 != DUMMY) {  // CP r
-        DEBUG("CP r\n");
+        DEBUG(1, "CP A, " << stringify_reg(r8_2) << "\n");
         uint8_t const a = get_register8(REG_A);
         uint8_t const r = get_register8(r8_1);
         set_flag(FL_C, detect_borrow(a, r, 8));
@@ -958,7 +977,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11111110) {  // CP n
-        DEBUG("CP n (n = " << std::hex << "0x" << (int)n8 << std::dec << ")\n");
+        DEBUG(1, "CP n " << std::hex << "0x" << (int64_t)n8 << std::dec << "\n");
         uint8_t const a = get_register8(REG_A);
         set_flag(FL_C, detect_borrow(a, n8, 8));
         set_flag(FL_H, detect_borrow(a, n8, 4));
@@ -967,7 +986,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10111110) {  // CP (HL)
-        DEBUG("CP (HL)\n");
+        DEBUG(1, "CP (HL)\n");
         uint8_t const a = get_register8(REG_A);
         uint8_t const hl_read = read_mem8(get_doublereg(REG_H, REG_L));
         set_flag(FL_C, detect_borrow(a, hl_read, 8));
@@ -977,7 +996,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (top_two == 0b00 && r8_1 != DUMMY && bottom_three == 0b100) {  // INC r
-        DEBUG("INC r\n");
+        DEBUG(1, "INC " << stringify_reg(r8_1) << "\n");
         uint8_t const r_val = get_register8(r8_1);
         set_register8(r8_1, r_val + 1);
         set_flag(FL_H, detect_carry(r_val, 1, 3));
@@ -986,7 +1005,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b00110100) {  // INC (HL)
-        DEBUG("INC (HL)\n");
+        DEBUG(1, "INC (HL)\n");
         uint16_t const hl = get_doublereg(REG_H, REG_L);
         uint8_t const hl_read = read_mem8(hl);
         write_mem8(hl, hl_read + 1);
@@ -996,7 +1015,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 3;
         pc += 1;
     } else if (top_two == 0b00 && r8_1 != DUMMY && bottom_three == 0b101) {  // DEC r
-        DEBUG("DEC r (r = " << stringify_reg(r8_1) << ")\n");
+        DEBUG(1, "DEC " << stringify_reg(r8_1) << "\n");
         uint8_t const prev_r_val = get_register8(r8_1);
         set_register8(r8_1, prev_r_val - 1);
         set_flag(FL_H, detect_borrow(prev_r_val, 1, 4));
@@ -1005,7 +1024,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b00110101) {  // DEC (HL)
-        DEBUG("DEC (HL)\n");
+        DEBUG(1, "DEC (HL)\n");
         uint16_t const hl = get_doublereg(REG_H, REG_L);
         uint8_t const hl_read = read_mem8(hl);
         write_mem8(hl, hl_read - 1);
@@ -1015,6 +1034,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if ((instruction & 0b11001111) == 0b00001001) {  // ADD HL, ss
+        DEBUG(1, "ADD HL, " << stringify_dd_doublereg(doublereg_bits) << "\n");
         uint16_t const hl = get_doublereg(REG_H, REG_L);
         uint16_t const ss = get_doublereg(s1, s2);
         set_doublereg(REG_H, REG_L, hl + ss);
@@ -1026,19 +1046,19 @@ int GameBoy::execute_instruction(uint16_t addr) {
         pc += 1;
         // } else if (instruction == 0b11101000) { // ADD SP, e
     } else if ((instruction & 0b11001111) == 0b00000011) {  // INC ss
-        DEBUG("INC ss\n");
+        DEBUG(1, "INC " << stringify_dd_doublereg(doublereg_bits) << "\n");
         set_doublereg(s1, s2, get_doublereg(s1, s2) + 1);
         // It's weird, but these instructions don't touch the flags
         cycles_to_wait += 2;
         pc += 1;
     } else if ((instruction & 0b11001111) == 0b00001011) {  // DEC ss
-        DEBUG("DEC " << stringify_dd_doublereg(doublereg_bits) << "\n");
+        DEBUG(1, "DEC " << stringify_dd_doublereg(doublereg_bits) << "\n");
         set_doublereg(s1, s2, get_doublereg(s1, s2) - 1);
         // It's weird, but these instructions don't touch the flags
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b00000111) {  // RLCA
-        DEBUG("RLCA\n");
+        DEBUG(1, "RLCA\n");
         bool const lost_bit = get_register8(REG_A) >> 7;
         set_register8(REG_A, (get_register8(REG_A) << 1) | lost_bit);
         set_flag(FL_C, lost_bit);
@@ -1048,7 +1068,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b00010111) {  // RLA
-        DEBUG("RLA\n");
+        DEBUG(1, "RLA\n");
         bool const lost_bit = get_register8(REG_A) >> 7;
         bool const old_fl_c = get_flag(FL_C);
         set_register8(REG_A, (get_register8(REG_A) << 1) | old_fl_c);
@@ -1059,7 +1079,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b00001111) {  // RRCA
-        DEBUG("RRCA\n");
+        DEBUG(1, "RRCA\n");
         bool const lost_bit = get_register8(REG_A) & 0b1;
         set_register8(REG_A, (get_register8(REG_A) >> 1) + (lost_bit << 7));
         set_flag(FL_C, lost_bit);
@@ -1069,7 +1089,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b00011111) {  // RRA
-        DEBUG("RRA\n");
+        DEBUG(1, "RRA\n");
         bool const lost_bit = get_register8(REG_A) & 0b1;
         bool const old_fl_c = get_flag(FL_C);
         set_register8(REG_A, (old_fl_c << 7) | (get_register8(REG_A) >> 1));
@@ -1080,8 +1100,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00000 && (n8 & 0b111) != DUMMY) {  // RLC r
-        DEBUG("RLC r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "RLC " << stringify_reg(r) << "\n");
         bool const lost_bit = get_register8(r) >> 7;
         set_register8(r, (get_register8(r) << 1) | lost_bit);
         set_flag(FL_C, lost_bit);
@@ -1091,7 +1111,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11001011 && n8 == 0b00000110) {  // RLC (HL)
-        DEBUG("RLC (HL)\n");
+        DEBUG(1, "RLC (HL)\n");
         auto const hl = get_doublereg(REG_H, REG_L);
         bool const lost_bit = read_mem8(hl) >> 7;
         write_mem8(hl, (read_mem8(hl) << 1) | lost_bit);
@@ -1102,8 +1122,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00010 && (n8 & 0b111) != DUMMY) {  // RL r
-        DEBUG("RL r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "RL " << stringify_reg(r) << "\n");
         bool const old_fl_c = get_flag(FL_C);
         bool const lost_bit = get_register8(r) >> 7;
         set_register8(r, (get_register8(r) << 1) | old_fl_c);
@@ -1114,7 +1134,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 1;
     } else if (instruction == 0b11001011 && n8 == 0b00010110) {  // RL (HL)
-        DEBUG("RL (HL)\n");
+        DEBUG(1, "RL (HL)\n");
         auto const hl = get_doublereg(REG_H, REG_L);
         bool const old_fl_c = get_flag(FL_C);
         bool const lost_bit = read_mem8(hl) >> 7;
@@ -1126,8 +1146,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00001 && (n8 & 0b111) != DUMMY) {  // RRC r
-        DEBUG("RRC r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "RRC " << stringify_reg(r) << "\n");
         bool const lost_bit = get_register8(r) & 0b1;
         set_register8(r, (lost_bit << 7) | (get_register8(r) >> 1));
         set_flag(FL_C, lost_bit);
@@ -1137,7 +1157,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11001011 && n8 == 0b00001110) {  // RRC (HL)
-        DEBUG("RRC (HL)\n");
+        DEBUG(1, "RRC (HL)\n");
         auto const hl = get_doublereg(REG_H, REG_L);
         bool const lost_bit = read_mem8(hl) & 0b1;
         write_mem8(hl, (lost_bit << 7) | (read_mem8(hl) >> 1));
@@ -1148,8 +1168,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00011 && (n8 & 0b111) != DUMMY) {  // RR r
-        DEBUG("RR r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "RR " << r << "\n");
         bool const lost_bit = get_register8(r) & 0b1;
         bool const old_fl_c = get_flag(FL_C);
         set_register8(r, (old_fl_c << 7) | (get_register8(r) >> 1));
@@ -1158,9 +1178,9 @@ int GameBoy::execute_instruction(uint16_t addr) {
         set_flag(FL_N, 0);
         set_flag(FL_Z, get_register8(r));
         cycles_to_wait += 2;
-        pc += 1;
+        pc += 2;
     } else if (instruction == 0b11011011 && n8 == 0b00011110) {  // RR (HL)
-        DEBUG("RR (HL)\n");
+        DEBUG(1, "RR (HL)\n");
         auto const hl = get_doublereg(REG_H, REG_L);
         bool const lost_bit = read_mem8(hl) & 0b1;
         bool const old_fl_c = get_flag(FL_C);
@@ -1172,8 +1192,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00100 && (n8 & 0b111) != DUMMY) {  // SLA r
-        DEBUG("SLA r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "SLA " << stringify_reg(r) << "\n");
         set_flag(FL_C, get_register8(r) >> 7);
         set_register8(r, get_register8(r) << 1);
         set_flag(FL_H, 0);
@@ -1182,7 +1202,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11011011 && n8 == 0b00100110) {  // SLA (HL)
-        DEBUG("SLA (HL)\n");
+        DEBUG(1, "SLA (HL)\n");
         uint16_t const hl = get_doublereg(REG_H, REG_L);
         uint8_t const hl_read = read_mem8(get_doublereg(REG_H, REG_L));
         set_flag(FL_C, hl_read >> 7);
@@ -1193,8 +1213,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00101 && (n8 & 0b111) != DUMMY) {  // SRA r
-        DEBUG("SRA r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "SRA " << stringify_reg(r) << "\n");
         set_flag(FL_C, get_register8(r) & 0b1);
         set_register8(r, (get_register8(r) & 0b10000000) | (get_register8(r) >> 1));
         set_flag(FL_H, 0);
@@ -1203,7 +1223,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11001011 && n8 == 0b00101110) {  // SRA (HL)
-        DEBUG("SRA (HL)\n");
+        DEBUG(1, "SRA (HL)\n");
         uint16_t const hl = get_doublereg(REG_H, REG_L);
         uint8_t const hl_read = read_mem8(get_doublereg(REG_H, REG_L));
         set_flag(FL_C, hl_read & 0b1);
@@ -1214,8 +1234,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00111 && (n8 & 0b111) != DUMMY) {  // SRL r
-        DEBUG("SRL r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "SRL " << stringify_reg(r) << "\n");
         bool const lost_bit = get_register8(r) & 0b1;
         set_register8(r, get_register8(r) >> 1);
         set_flag(FL_C, lost_bit);
@@ -1225,7 +1245,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11001011 && n8 == 0b00111110) {  // SRL (HL)
-        DEBUG("SRL (HL)\n");
+        DEBUG(1, "SRL (HL)\n");
         uint16_t const hl = get_doublereg(REG_H, REG_L);
         uint8_t const hl_read = read_mem8(hl);
         bool const lost_bit = hl_read & 0b1;
@@ -1237,8 +1257,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 3) == 0b00110 && (n8 & 0b111) != DUMMY) {  // SWAP r
-        DEBUG("SWAP r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "SWAP " << stringify_reg(r) << "\n");
         uint8_t const r_val = get_register8(r);
         set_register8(r, (r_val << 4) | (r_val >> 4));
         set_flag(FL_C, 0);
@@ -1248,7 +1268,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11001011 && n8 == 0b00110110) {  // SWAP (HL)
-        DEBUG("SWAP (HL)\n");
+        DEBUG(1, "SWAP (HL)\n");
         uint16_t const hl = get_doublereg(REG_H, REG_L);
         uint8_t const hl_read = read_mem8(hl);
         write_mem8(hl, (hl_read << 4) | (hl_read >> 4));
@@ -1259,8 +1279,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 6) == 0b01 && (n8 & 0b111) != DUMMY) {  // BIT b, r
-        DEBUG("BIT b, r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "BIT b, " << stringify_reg(r) << "\n");
         uint8_t const b = (n8 >> 3) & 0b111;
         set_flag(FL_H, 1);
         set_flag(FL_N, 0);
@@ -1268,7 +1288,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 6) == 0b01 && (n8 & 0b111) == DUMMY) {  // BIT b, (HL)
-        DEBUG("BIT b, (HL)\n");
+        DEBUG(1, "BIT b, (HL)\n");
         uint8_t const hl_read = read_mem8(get_doublereg(REG_H, REG_L));
         uint8_t const b = (n8 >> 3) & 0b111;
         set_flag(FL_H, 1);
@@ -1277,14 +1297,14 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 3;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 6) == 0b11 && (n8 & 0b111) != DUMMY) {  // SET b, r
-        DEBUG("SET b, r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "SET b, " << stringify_reg(r) << "\n");
         uint8_t const b = (n8 >> 3) & 0b111;
         set_register8(r, get_register8(r) | (1 << b));
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 6) == 0b11 && (n8 & 0b111) == DUMMY) {  // SET b, (HL)
-        DEBUG("SET b, (HL)\n");
+        DEBUG(1, "SET b, (HL)\n");
         uint8_t const b = (n8 >> 3) & 0b111;
         auto hl = get_doublereg(REG_H, REG_L);
         auto hl_read = read_mem8(hl);
@@ -1292,14 +1312,14 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 6) == 0b10 && (n8 & 0b111) != DUMMY) {  // RES b, r
-        DEBUG("RES b, r\n");
         Register8 const r = (Register8)(n8 & 0b111);
+        DEBUG(1, "RES b, " << stringify_reg(r) << "\n");
         uint8_t const b = (n8 >> 3) & 0b111;
         set_register8(r, get_register8(r) & ~(1 << b));
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11001011 && (n8 >> 6) == 0b10 && (n8 & 0b111) == DUMMY) {  // RES b, (HL)
-        DEBUG("RES b, (HL)\n");
+        DEBUG(1, "RES b, (HL)\n");
         uint8_t const b = (n8 >> 3) & 0b111;
         auto hl = get_doublereg(REG_H, REG_L);
         auto hl_read = read_mem8(hl);
@@ -1307,12 +1327,12 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         pc += 2;
     } else if (instruction == 0b11000011) {  // JP nn
-        DEBUG("JP nn (nn = 0x" << std::hex << (int)n16 << std::dec << ")\n");
+        DEBUG(1, "JP 0x" << std::hex << (int64_t)n16 << std::dec << "\n");
         pc = n16;
         cycles_to_wait += 4;
         // Don't increment pc here.
     } else if ((instruction & 0b11100111) == 0b11000010) {  // JP cc, nn
-        DEBUG("JP cc, nn\n");
+        DEBUG(1, "JP " << stringify_cc_condition(cc) << ", " << std::hex << n16 << std::dec << "\n");
         bool jumping = (cc == 0b00 && get_flag(FL_Z) == 0) || (cc == 0b01 && get_flag(FL_Z) == 1) ||
                        (cc == 0b10 && get_flag(FL_C) == 0) || (cc == 0b11 && get_flag(FL_C) == 1);
         if (jumping) {
@@ -1323,7 +1343,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
             pc += 3;
         }
     } else if (instruction == 0b00011000) {  // JR e
-        DEBUG("JR e (e = " << (int)(uint8_t)e8 << ")\n");
+        DEBUG(1, "JR 0x" << std::hex << (int32_t)pc + e8 + 2 << std::dec << "\n");
         pc += 2;  // because e is actually stored as (e-2) for this instruction
         int32_t pc_signed_32 = pc;
         pc_signed_32 += e8;
@@ -1331,8 +1351,8 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 3;
         // Don't increment pc here
     } else if ((instruction & 0b11100111) == 0b00100000) {  // JR cc, e
-        DEBUG("JR cc, e (cc = " << stringify_cc_condition(cc) << ", e = "
-                                << "0x" << std::hex << (int)(uint8_t)e8 << std::dec << ")\n");
+        DEBUG(1, "JR " << stringify_cc_condition(cc) << ", "
+                       << "0x" << std::hex << (int32_t)pc + e8 + 2 << std::dec << "\n");
         bool jumping = (cc == 0b00 && get_flag(FL_Z) == 0) || (cc == 0b01 && get_flag(FL_Z) == 1) ||
                        (cc == 0b10 && get_flag(FL_C) == 0) || (cc == 0b11 && get_flag(FL_C) == 1);
         if (jumping) {
@@ -1347,27 +1367,27 @@ int GameBoy::execute_instruction(uint16_t addr) {
             pc += 2;
         }
     } else if (instruction == 0b11101001) {  // JP (HL)
-        DEBUG("JP (HL)\n");
+        DEBUG(1, "JP (HL)\n");
         pc = get_doublereg(REG_H, REG_L);
         cycles_to_wait += 1;
         // Don't increment pc here
     } else if (instruction == 0b11001101) {  // CALL nn
-        DEBUG("CALL nn\n");
+        DEBUG(1, "CALL 0x" << std::hex << n16 << std::dec << "\n");
         uint16_t const sp = get_doublereg(REG_S, REG_P);
         uint16_t const old_pc = pc + 3;
         write_mem16(sp - 2, old_pc);
         pc = n16;
-        set_doublereg(REG_S, REG_P, get_doublereg(REG_S, REG_P) - 2);
+        set_doublereg(REG_S, REG_P, sp - 2);
         cycles_to_wait += 6;
         // Don't increment pc here
     } else if ((instruction & 0b11100111) == 0b11000100) {  // CALL cc, nn
-        DEBUG("CALL cc, nn\n");
-        uint16_t const sp = get_doublereg(REG_S, REG_P);
+        DEBUG(1, "CALL " << stringify_cc_condition(cc) << ", " << std::hex << (int64_t)n16 << std::dec << "\n");
         bool calling = (cc == 0b00 && get_flag(FL_Z) == 0) || (cc == 0b01 && get_flag(FL_Z) == 1) ||
                        (cc == 0b10 && get_flag(FL_C) == 0) || (cc == 0b11 && get_flag(FL_C) == 1);
         if (calling) {
-            write_mem8(sp - 1, pc >> 8);
-            write_mem8(sp - 2, pc & 0xFF);
+            uint16_t const sp = get_doublereg(REG_S, REG_P);
+            uint16_t const old_pc = pc + 3;
+            write_mem16(sp - 2, old_pc);
             pc = n16;
             set_doublereg(REG_S, REG_P, sp - 2);
             cycles_to_wait += 6;
@@ -1377,14 +1397,14 @@ int GameBoy::execute_instruction(uint16_t addr) {
             pc += 3;
         }
     } else if (instruction == 0b11001001) {  // RET
-        DEBUG("RET\n");
+        DEBUG(1, "RET\n");
         auto const sp = get_doublereg(REG_S, REG_P);
         pc = (read_mem8(sp + 1) << 8) | read_mem8(sp);
         set_doublereg(REG_S, REG_P, sp + 2);
         cycles_to_wait += 4;
         // Don't increment pc here
     } else if (instruction == 0b11011001) {  // RETI
-        DEBUG("IRET\n");
+        DEBUG(1, "IRET\n");
         ime = 1;
         auto const sp = get_doublereg(REG_S, REG_P);
         pc = (read_mem8(sp + 1) << 8) | read_mem8(sp);
@@ -1393,7 +1413,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         // Don't increment pc here
         handle_interrupts();
     } else if ((instruction & 0b11100111) == 0b11000000) {  // RET cc
-        DEBUG("RET cc\n");
+        DEBUG(1, "RET cc\n");
         bool retting = (cc == 0b00 && get_flag(FL_Z) == 0) || (cc == 0b01 && get_flag(FL_Z) == 1) ||
                        (cc == 0b10 && get_flag(FL_C) == 0) || (cc == 0b11 && get_flag(FL_C) == 1);
         if (retting) {
@@ -1407,7 +1427,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
             pc += 1;
         }
     } else if (top_two == 0b11 && bottom_three == 0b111) {  // RST t
-        DEBUG("RST t\n");
+        DEBUG(1, "RST t\n");
         uint16_t const sp = get_doublereg(REG_S, REG_P);
         write_mem16(sp - 2, pc + 1);
         set_doublereg(REG_S, REG_P, get_doublereg(REG_S, REG_P) - 2);
@@ -1468,7 +1488,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
                 carry = true;
             } else {
                 std::cerr << "Invalid state for DAA." << std::endl;
-                exit(1);
+                // exit(1);
             }
         }
         set_flag(FL_C, carry);
@@ -1478,44 +1498,44 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b00101111) {  // CPL
-        DEBUG("CPL\n");
+        DEBUG(1, "CPL\n");
         set_register8(REG_A, ~get_register8(REG_A));
         set_flag(FL_H, 1);
         set_flag(FL_N, 1);
         pc += 1;
     } else if (instruction == 0b00000000) {  // NOP
-        DEBUG("NOP\n");
+        DEBUG(1, "NOP\n");
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b00111111) {  // CCF
-        DEBUG("CCF\n");
+        DEBUG(1, "CCF\n");
         set_flag(FL_C, !get_flag(FL_C));
         set_flag(FL_H, 0);
         set_flag(FL_N, 0);
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b00110111) {  // SCF
-        DEBUG("SCF\n");
+        DEBUG(1, "SCF\n");
         set_flag(FL_C, 1);
         set_flag(FL_H, 0);
         set_flag(FL_N, 0);
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11110011) {  // DI
-        DEBUG("DI\n");
+        DEBUG(1, "DI\n");
         ime = 0;
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11111011) {  // EI
         // BUG:
         // The effect of EI should actually be delayed by one cycle (so EI DI should not allow any interrupts)
-        DEBUG("EI\n");
+        DEBUG(1, "EI\n");
         ime = 1;
         cycles_to_wait += 1;
         pc += 1;
         handle_interrupts();
     } else if (instruction == 0b01110110) {  // HALT
-        DEBUG("HALT\n");
+        DEBUG(1, "HALT\n");
         cycles_to_wait += 1;
         pc += 1;  // There is a bug in the DMG s.t. making this a 2 would be more accurate.
                   // Usually, people stick NOPs after HALTs for good measure, so it shouldn't be a problem if we don't
@@ -1524,16 +1544,16 @@ int GameBoy::execute_instruction(uint16_t addr) {
             return 1;  // We're overloading HALT to be poweroff
         }
     } else if (instruction == 0b00010000) {  // STOP
-        DEBUG("STOP\n");
-        DEBUG("STOP is unimplemented.\n");
+        DEBUG(1, "STOP\n");
+        DEBUG(1, "STOP is unimplemented.\n");
         if (n8 != 0) {
-            DEBUG("This is a corrupted STOP.\n");
+            DEBUG(1, "This is a corrupted STOP.\n");
         }
         cycles_to_wait += 1;
         pc += 2;
     } else {
-        DEBUG("Invalid instruction: 0b" << std::bitset<8>{instruction} << "\n");
-        return 1;
+        DEBUG(1, "Invalid instruction: 0b" << std::bitset<8>{instruction} << "\n");
+        pc += 1;
     }
 
     return 0;
