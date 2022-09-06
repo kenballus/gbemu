@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
     args.erase("--freeze");
 
     if (args.size() != 1) {
-        std::cerr << "Usage: " << argv[0] << " [--headless] <ROM>\n";
+        std::cerr << "Usage: " << argv[0] << " [--headless] [--freeze] <ROM>\n";
         return 1;
     }
     gb.load_rom(*args.cbegin());
@@ -167,9 +167,14 @@ int main(int argc, char* argv[]) {
                     } else if (event.key.keysym.sym == SDLK_s) {
                         gb.paused = false;
                         gb.execute_instruction(gb.pc);
+                        gb.wait();
                         gb.paused = true;
-                    } else if (event.key.keysym.sym == SDLK_d) {
+                    } else if (event.key.keysym.sym == SDLK_r) {
                         gb.dump_state();
+                    } else if (event.key.keysym.sym == SDLK_m) {
+                        gb.dump_mem();
+                    } else if (event.key.keysym.sym == SDLK_p) {
+                        gb.dump_screen();
                     }
                 }
             }

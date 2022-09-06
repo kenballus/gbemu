@@ -10,9 +10,13 @@
 #include <string>
 #include <thread>
 
+using std::int16_t;
+using std::int32_t;
+using std::int64_t;
 using std::int8_t;
 using std::uint16_t;
 using std::uint32_t;
+using std::uint64_t;
 using std::uint8_t;
 
 std::string stringify_reg(Register8 r) {
@@ -123,6 +127,14 @@ bool detect_borrow(uint32_t a, uint32_t b, uint8_t bit) {
     return a < b;
 }
 
+void GameBoy::zero_screen(void) {
+    for (uint64_t r = 0; r < GB_SCREEN_HEIGHT; r++) {
+        for (uint64_t c = 0; c < GB_SCREEN_WIDTH; c++) {
+            screen[r][c] = 0;
+        }
+    }
+}
+
 GameBoy::GameBoy(void) {
     DEBUG(1, "Bringin' her up!\n");
     set_doublereg(REG_A, REG_F, 0x0100);
@@ -165,11 +177,7 @@ GameBoy::GameBoy(void) {
     write_mem8(WX, 0x00);
     write_mem8(0xFFFF, 0x00);
 
-    for (uint64_t r = 0; r < GB_SCREEN_HEIGHT; r++) {
-        for (uint64_t c = 0; c < GB_SCREEN_WIDTH; c++) {
-            screen[r][c] = 0;
-        }
-    }
+    zero_screen();
 }
 
 void GameBoy::load_rom(std::string romfile) {
@@ -216,7 +224,7 @@ void GameBoy::wait(void) {
             }
         }
 
-        if ((read_mem8(LCD_CONTROL) >> 7)) {  // If the LCD is enabled (LCDC.7)
+        if (read_mem8(LCD_CONTROL) >> 7) {  // If the LCD is enabled (LCDC.7)
             update_screen();
         }
 
@@ -272,12 +280,11 @@ void GameBoy::handle_interrupts(void) {
     ime = 0;
 
     uint16_t sp = get_doublereg(REG_S, REG_P);
-    write_mem8(sp - 1, pc >> 8);
-    write_mem8(sp - 2, pc & 0xFF);
+    write_mem16(get_doublereg(REG_S, REG_P), pc);
     set_doublereg(REG_S, REG_P, sp - 2);
 
-    uint16_t new_pc = 0;  // This would be an invalid place to execute code from, I think.
-                          // It at least FEELS like a safe choice. We'll see.
+    uint16_t new_pc = 0x9800;  // This would be an invalid place to execute code from, I think.
+                               // It at least FEELS like a safe choice. We'll see.
     if (vblank && vblank_interrupt_enabled) {
         new_pc = VBLANK_INTERRUPT_ADDRESS;
         write_mem8(INTERRUPT_FLAGS, interrupt_bits & ~(1 << 0));
@@ -308,13 +315,13 @@ void GameBoy::handle_interrupts(void) {
 
 void GameBoy::write_mem8(uint16_t addr, uint8_t val) {
     if (read_mem8(addr) != val) {
-        DEBUG(2, "\tWriting " << std::hex << "0x" << std::setw(2) << std::setfill('0') << (int64_t)val << std::setw(0)
-                              << " to address 0x" << addr << std::dec << "\n");
+        DEBUG(2, "\tWriting 0x" << std::hex << std::setw(2) << std::setfill('0') << (int64_t)val << std::setw(0)
+                                << " to address 0x" << addr << std::dec << "\n");
     }
     if (addr == DIVIDER_REGISTER) {
         ram[addr] = 0x00;  // See page 25 of the Nintendo programming docs for why
     } else if (addr == JOYPAD_PORT) {
-        // joypad_mode = (JoypadMode)((val >> 4) & 0b1);
+        joypad_mode = (JoypadMode)((val >> 4) & 0b1);
     } else if (addr == INTERRUPT_FLAGS) {
         if ((val & 0b00000) != 0) {
             std::cerr << "Attempted illegal write to interrupt flags.\n";
@@ -337,9 +344,9 @@ void GameBoy::write_mem8(uint16_t addr, uint8_t val) {
         ram[addr] = val;
     } else if (0x2000 <= addr && addr <= 0x5FFF) {
         std::cerr << "Attempted bank switch, which is not implemented.\n";
-        exit(1);
+        // exit(1);
     } else {
-        std::cerr << "Attempted illegal write of " << std::hex << (int64_t)val << " to address 0x" << (int64_t)addr
+        std::cerr << "Attempted illegal write of 0x" << std::hex << (int64_t)val << " to address 0x" << (int64_t)addr
                   << std::dec << "\n";
         // exit(1);
     }
@@ -353,8 +360,8 @@ void GameBoy::write_mem16(uint16_t addr, uint16_t val) {
 
 void GameBoy::set_register8(Register8 const r8, uint8_t const u8) {
     registers[r8] = u8;
-    DEBUG(2, "\tSetting register " << stringify_reg(r8) << " to " << std::hex << "0x" << std::setw(2)
-                                   << std::setfill('0') << (int64_t)u8 << std::setw(0) << std::dec << std::endl);
+    DEBUG(2, "\tSetting register " << stringify_reg(r8) << " to 0x" << std::hex << std::setw(2) << std::setfill('0')
+                                   << (int64_t)u8 << std::setw(0) << std::dec << std::endl);
 }
 
 uint8_t GameBoy::get_register8(Register8 r8) const { return registers[r8]; }
@@ -423,7 +430,6 @@ void GameBoy::enter_transferring(void) {
 }
 
 void GameBoy::write_tile_to_screen(uint8_t r, uint8_t c, uint16_t tile_address) {
-    // exit(1);
     for (uint8_t i = 0; i < 8; i++) {  // For each row in the tile,
         // Read a row from the tile
         // (one row is 2 bytes, interleaved)
@@ -432,8 +438,9 @@ void GameBoy::write_tile_to_screen(uint8_t r, uint8_t c, uint16_t tile_address) 
         uint16_t const tile_data = (tile_data_hi << 8) | tile_data_lo;
 
         for (uint8_t j = 0; j < 8; j++) {  // For each pixel in the row,
-            int16_t const y = r + i - read_mem8(SCY);
-            int16_t const x = c + j - read_mem8(SCX);
+            int16_t const y = r + i + read_mem8(SCY);
+            int16_t const x = c + j + read_mem8(SCX);
+
             if (0 <= y && y < GB_SCREEN_HEIGHT && 0 <= x && x < GB_SCREEN_WIDTH) {
                 uint8_t const color = ((tile_data >> (14 - j)) & 0b10) + ((tile_data >> (7 - j)) & 0b1);
                 screen[y][x] = color;
@@ -528,7 +535,7 @@ void GameBoy::dump_mem(void) const {
             }
         }
     }
-    std::cout << TOTAL_RAM << std::endl << std::dec << std::setw(0);
+    std::cout << std::hex << TOTAL_RAM << std::dec << std::setw(0) << std::endl;
 }
 
 void GameBoy::dump_screen(void) const {
@@ -560,8 +567,9 @@ void GameBoy::dump_screen(void) const {
 void GameBoy::toggle_pause(void) { paused = !paused; }
 
 int GameBoy::execute_instruction(uint16_t addr) {
-    if (paused)
+    if (paused) {
         return 0;
+    }
 
     uint8_t const instruction = read_mem8(addr);
     uint8_t const top_two = instruction >> 6;
@@ -626,7 +634,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (top_two == 0b01 && r8_1 != DUMMY && bottom_three == 0b110) {  // LD r, (HL)
-        DEBUG(1, "LD r, (HL)\n");
+        DEBUG(1, "LD " << stringify_reg(r8_1) << ", (HL)\n");
         set_register8(r8_1, read_mem8(get_doublereg(REG_H, REG_L)));
         cycles_to_wait += 2;
         pc += 1;
@@ -929,7 +937,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10110110) {  // OR (HL)
-        DEBUG(1, "OR (HL)\n");
+        DEBUG(1, "OR A, (HL)\n");
         uint8_t const hl_read = read_mem8(get_doublereg(REG_H, REG_L));
         uint8_t const a = get_register8(REG_A);
         set_register8(REG_A, a | hl_read);
@@ -940,7 +948,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 1;
     } else if (top_five == 0b10101 && r8_2 != DUMMY) {  // XOR r
-        DEBUG(1, "XOR " << stringify_reg(r8_2) << "\n");
+        DEBUG(1, "XOR A, " << stringify_reg(r8_2) << "\n");
         set_register8(REG_A, get_register8(REG_A) ^ get_register8(r8_2));
         set_flag(FL_C, 0);
         set_flag(FL_H, 0);
@@ -958,7 +966,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10101110) {  // XOR (HL)
-        DEBUG(1, "XOR (HL)\n");
+        DEBUG(1, "XOR A, (HL)\n");
         set_register8(REG_A, get_register8(REG_A) ^ read_mem8(get_doublereg(REG_H, REG_L)));
         set_flag(FL_C, 0);
         set_flag(FL_H, 0);
@@ -977,7 +985,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 1;
         pc += 1;
     } else if (instruction == 0b11111110) {  // CP n
-        DEBUG(1, "CP n " << std::hex << "0x" << (int64_t)n8 << std::dec << "\n");
+        DEBUG(1, "CP A, 0x" << std::hex << (int64_t)n8 << std::dec << "\n");
         uint8_t const a = get_register8(REG_A);
         set_flag(FL_C, detect_borrow(a, n8, 8));
         set_flag(FL_H, detect_borrow(a, n8, 4));
@@ -986,7 +994,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b10111110) {  // CP (HL)
-        DEBUG(1, "CP (HL)\n");
+        DEBUG(1, "CP A, (HL)\n");
         uint8_t const a = get_register8(REG_A);
         uint8_t const hl_read = read_mem8(get_doublereg(REG_H, REG_L));
         set_flag(FL_C, detect_borrow(a, hl_read, 8));
@@ -1332,7 +1340,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 4;
         // Don't increment pc here.
     } else if ((instruction & 0b11100111) == 0b11000010) {  // JP cc, nn
-        DEBUG(1, "JP " << stringify_cc_condition(cc) << ", " << std::hex << n16 << std::dec << "\n");
+        DEBUG(1, "JP " << stringify_cc_condition(cc) << ", 0x" << std::hex << n16 << std::dec << "\n");
         bool jumping = (cc == 0b00 && get_flag(FL_Z) == 0) || (cc == 0b01 && get_flag(FL_Z) == 1) ||
                        (cc == 0b10 && get_flag(FL_C) == 0) || (cc == 0b11 && get_flag(FL_C) == 1);
         if (jumping) {
@@ -1381,7 +1389,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         cycles_to_wait += 6;
         // Don't increment pc here
     } else if ((instruction & 0b11100111) == 0b11000100) {  // CALL cc, nn
-        DEBUG(1, "CALL " << stringify_cc_condition(cc) << ", " << std::hex << (int64_t)n16 << std::dec << "\n");
+        DEBUG(1, "CALL " << stringify_cc_condition(cc) << ", 0x" << std::hex << (int64_t)n16 << std::dec << "\n");
         bool calling = (cc == 0b00 && get_flag(FL_Z) == 0) || (cc == 0b01 && get_flag(FL_Z) == 1) ||
                        (cc == 0b10 && get_flag(FL_C) == 0) || (cc == 0b11 && get_flag(FL_C) == 1);
         if (calling) {
