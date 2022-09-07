@@ -12,6 +12,15 @@
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 640
 
+#define KEY_MAPPED_TO_A SDLK_a
+#define KEY_MAPPED_TO_B SDLK_b
+#define KEY_MAPPED_TO_START SDLK_LSHIFT
+#define KEY_MAPPED_TO_SELECT SDLK_RSHIFT
+#define KEY_MAPPED_TO_UP SDLK_UP
+#define KEY_MAPPED_TO_DOWN SDLK_DOWN
+#define KEY_MAPPED_TO_LEFT SDLK_LEFT
+#define KEY_MAPPED_TO_RIGHT SDLK_RIGHT
+
 typedef Uint32 pixel_t;
 pixel_t color_white;
 pixel_t color_light_grey;
@@ -131,7 +140,7 @@ int main(int argc, char* argv[]) {
 
     bool const headless = args.contains("--headless");
     args.erase("--headless");
-    gb.paused = args.contains("--freeze");
+    bool debug_paused = args.contains("--freeze");
     args.erase("--freeze");
 
     if (args.size() != 1) {
@@ -150,6 +159,7 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, sigint_handler);
 
     uint8_t counter = 0;
+    bool stepping = false;
     while (true) {
         if (!headless) {
             if (counter == 0) {
@@ -162,29 +172,86 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (event.type == SDL_KEYDOWN) {
-                    if (event.key.keysym.sym == SDLK_RETURN) {
-                        gb.toggle_pause();
-                    } else if (event.key.keysym.sym == SDLK_s) {
-                        gb.paused = false;
-                        gb.execute_instruction(gb.pc);
-                        gb.wait();
-                        gb.paused = true;
-                    } else if (event.key.keysym.sym == SDLK_r) {
-                        gb.dump_state();
-                    } else if (event.key.keysym.sym == SDLK_m) {
-                        gb.dump_mem();
-                    } else if (event.key.keysym.sym == SDLK_p) {
-                        gb.dump_screen();
+                    switch (event.key.keysym.sym) {
+                        case SDLK_RETURN:
+                            debug_paused = !debug_paused;
+                            break;
+                        case SDLK_i:
+                            stepping = true;
+                            break;
+                        case SDLK_s:
+                            gb.dump_screen();
+                            break;
+                        case SDLK_r:
+                            gb.dump_state();
+                            break;
+                        case SDLK_m:
+                            gb.dump_mem();
+                            break;
+                        case KEY_MAPPED_TO_A:
+                            gb.press_button(GB_KEY_A);
+                            break;
+                        case KEY_MAPPED_TO_B:
+                            gb.press_button(GB_KEY_B);
+                            break;
+                        case KEY_MAPPED_TO_START:
+                            gb.press_button(GB_KEY_START);
+                            break;
+                        case KEY_MAPPED_TO_SELECT:
+                            gb.press_button(GB_KEY_SELECT);
+                            break;
+                        case KEY_MAPPED_TO_UP:
+                            gb.press_button(GB_KEY_UP);
+                            break;
+                        case KEY_MAPPED_TO_DOWN:
+                            gb.press_button(GB_KEY_DOWN);
+                            break;
+                        case KEY_MAPPED_TO_LEFT:
+                            gb.press_button(GB_KEY_LEFT);
+                            break;
+                        case KEY_MAPPED_TO_RIGHT:
+                            gb.press_button(GB_KEY_RIGHT);
+                            break;
+                    }
+                } else if (event.type == SDL_KEYUP) {
+                    switch (event.key.keysym.sym) {
+                        case KEY_MAPPED_TO_A:
+                            gb.release_button(GB_KEY_A);
+                            break;
+                        case KEY_MAPPED_TO_B:
+                            gb.release_button(GB_KEY_B);
+                            break;
+                        case KEY_MAPPED_TO_START:
+                            gb.release_button(GB_KEY_START);
+                            break;
+                        case KEY_MAPPED_TO_SELECT:
+                            gb.release_button(GB_KEY_SELECT);
+                            break;
+                        case KEY_MAPPED_TO_UP:
+                            gb.release_button(GB_KEY_UP);
+                            break;
+                        case KEY_MAPPED_TO_DOWN:
+                            gb.release_button(GB_KEY_DOWN);
+                            break;
+                        case KEY_MAPPED_TO_LEFT:
+                            gb.release_button(GB_KEY_LEFT);
+                            break;
+                        case KEY_MAPPED_TO_RIGHT:
+                            gb.release_button(GB_KEY_RIGHT);
+                            break;
                     }
                 }
             }
         }
-        gb.execute_instruction(gb.pc);
-        gb.wait();
+
+        if (stepping || !debug_paused) {
+            gb.execute_instruction(gb.pc);
+            gb.wait();
+            stepping = false;
+        }
 
         counter++;
     }
-
 done:
     // gb.dump_screen();
     // gb.dump_mem();

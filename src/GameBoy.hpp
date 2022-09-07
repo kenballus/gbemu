@@ -52,7 +52,8 @@ std::uint16_t const WY = 0xFF4A;
 std::uint16_t const WX = 0xFF4B;
 
 std::uint16_t const JOYPAD_PORT = 0xFF00;
-std::uint16_t const SERIAL_PORT = 0xFF01;
+std::uint16_t const SERIAL_DATA = 0xFF01;
+std::uint16_t const SERIAL_CONTROL = 0xFF02;
 std::uint16_t const INTERRUPT_FLAGS = 0xFF0F;
 std::uint16_t const DIVIDER_REGISTER = 0xFF04;
 std::uint16_t const TIMA = 0xFF05;
@@ -72,6 +73,17 @@ std::uint64_t const CLOCKS_PER_DIVIDER_INCREMENT = 64;
 
 // 16 ms/frame gets us a little over 60 fps
 std::uint64_t const MS_PER_CYCLE = 100;
+
+enum JoypadButton {
+    GB_KEY_A = 0,
+    GB_KEY_B = 1,
+    GB_KEY_START = 2,
+    GB_KEY_SELECT = 3,
+    GB_KEY_UP = 4,
+    GB_KEY_DOWN = 5,
+    GB_KEY_LEFT = 6,
+    GB_KEY_RIGHT = 7,
+};
 
 enum Register8 {
     REG_B = 0b000,
@@ -96,7 +108,7 @@ enum Flag {
 
 enum JoypadMode {
     DIRECTIONS = 0,
-    BUTTONS = 1,
+    ACTIONS = 1,
 };
 
 enum GraphicsMode {
@@ -120,7 +132,9 @@ public: // change to private when done debugging
     std::uint32_t dot_count = 0;
     GraphicsMode graphics_mode = SEARCHING;
 
-    bool paused = false;
+    bool keys_pressed[8];
+
+    bool halted = false;
 
     std::uint8_t screen[GB_SCREEN_HEIGHT][GB_SCREEN_WIDTH]; // We render everything to here.
 
@@ -148,11 +162,12 @@ public: // change to private when done debugging
     void enter_transferring(void);
     void update_screen(void);
     void render_background(void);
-    void write_tile_to_screen(std::uint8_t, std::uint8_t, std::uint16_t);
+    void write_bg_tile_to_screen(std::uint8_t, std::uint8_t, std::uint16_t);
+    void press_button(JoypadButton);
+    void release_button(JoypadButton);
 
     int execute_instruction(std::uint16_t addr);
     void dump_state(void) const;
     void dump_mem(void) const;
     void dump_screen(void) const;
-    void toggle_pause(void);
 };
