@@ -42,6 +42,8 @@ std::string stringify_reg(Register8 r) {
         case REG_P:
             return "P";
     }
+    std::cerr << "Register " << (int)r << " doesn't exist.\n";
+    exit(1);
 }
 
 std::string stringify_dd_doublereg(uint8_t doublereg_bits) {
@@ -85,6 +87,8 @@ std::string stringify_flag(Flag flag) {
         case FL_Z:
             return "Z";
     }
+    std::cerr << "Flag " << (int)flag << " doesn't exist.\n";
+    exit(1);
 }
 
 std::string stringify_cc_condition(uint8_t cc) {
@@ -103,7 +107,7 @@ std::string stringify_cc_condition(uint8_t cc) {
 }
 
 bool is_writable(uint16_t addr) {
-    if (0xFE00 <= addr && addr <= 0xFEff) {  // This is a hack. OAM should not be writable (or readable) at all times.
+    if (0xFE00 <= addr && addr <= 0xFEFF) {  // This is a hack. OAM should not be writable (or readable) at all times.
         return true;
     }
     return (addr >= UNSIGNED_TILE_DATA_BASE) && (addr < ECHO_RAM || addr >= OAM) &&
@@ -116,7 +120,7 @@ bool detect_carry(uint32_t a, uint32_t b, uint8_t bit) {
     a &= mask;
     b &= mask;
 
-    return a + b >= 1 << (bit + 1);
+    return a + b >= 1U << (bit + 1);
 }
 
 bool detect_borrow(uint32_t a, uint32_t b, uint8_t bit) {
@@ -137,10 +141,10 @@ void GameBoy::zero_screen(void) {
 
 GameBoy::GameBoy(void) {
     DEBUG(1, "Bringin' her up!\n");
-    set_doublereg(REG_A, REG_F, 0x0100);
-    set_doublereg(REG_B, REG_C, 0xFF13);
-    set_doublereg(REG_D, REG_E, 0x00C1);
-    set_doublereg(REG_H, REG_L, 0x8403);
+    set_doublereg(REG_A, REG_F, 0x01B0);
+    set_doublereg(REG_B, REG_C, 0x0013);
+    set_doublereg(REG_D, REG_E, 0x00D8);
+    set_doublereg(REG_H, REG_L, 0x014D);
     set_doublereg(REG_S, REG_P, 0xFFFE);
     write_mem8(TIMA, 0x00);
     write_mem8(TMA, 0x00);
@@ -167,7 +171,7 @@ GameBoy::GameBoy(void) {
     ram[LCD_STATUS] = 0x81;  // This is an illegal write otherwise.
     write_mem8(SCY, 0x00);
     write_mem8(SCX, 0x00);
-    write_mem8(LY, 0x91);
+    write_mem8(LY, 0x90);  // TODO: Change this back to 0x91
     write_mem8(LYC, 0x00);
     ram[OAM_DMA_START] = 0xFF;  // Don't want to trigger a DMA right now.
     write_mem8(0xFF47, 0xFC);
@@ -340,6 +344,7 @@ void GameBoy::write_mem8(uint16_t addr, uint8_t val) {
         DEBUG(2, "\tWriting 0x" << std::hex << std::setw(2) << std::setfill('0') << (int64_t)val << std::setw(0)
                                 << " to address 0x" << addr << std::dec << "\n");
     }
+
     if (addr == DIVIDER_REGISTER) {
         ram[addr] = 0x00;  // See page 25 of the Nintendo programming docs for why
     } else if (addr == JOYPAD_PORT) {
@@ -354,7 +359,7 @@ void GameBoy::write_mem8(uint16_t addr, uint8_t val) {
         do_dma(val);
     } else if (addr == SERIAL_DATA) {
         // std::cout << "[SERIAL] 0x" << std::hex << (int64_t)val << std::dec << std::endl;
-        std::cout << (char)val;
+        // std::cout << (char)val;
     } else if (is_writable(addr)) {
         ram[addr] = val;
     } else if (0x2000 <= addr && addr <= 0x5FFF) {
@@ -426,8 +431,11 @@ void GameBoy::enter_vblank(void) {
         write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) | 0b10);  // request a stat interrupt
     }
 
-    write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) | 0b00000001);  // request a vblank interrupt
-    handle_interrupts();
+    // If we call this function when LY is stubbed for testing, it shouldn't do an interrupt
+    if (read_mem8(LY) >= FIRST_VBLANK_SCANLINE) {
+        write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) | 0b00000001);  // request a vblank interrupt
+        handle_interrupts();
+    }
 
     graphics_mode = VBLANK;
 }
@@ -497,7 +505,7 @@ void GameBoy::update_screen(void) {
     dot_count %= 70224;  // It takes 70224 dots to do one frame
 
     // Update the current line number
-    write_mem8(LY, dot_count / 456);
+    // write_mem8(LY, dot_count / 456); // TODO: UNCOMMENT THIS LINE
 
     // STAT.2 is set iff LY=LYC, and updated constantly.
     if (read_mem8(LY) == read_mem8(LYC)) {
@@ -513,7 +521,7 @@ void GameBoy::update_screen(void) {
 
     if (dot_count >= 65664) {  // vblank
         if (graphics_mode != VBLANK) {
-            enter_vblank();
+            // enter_vblank(); // TODO: UNCOMMENT THIS LINE
             // Draw the whole background at once upon entering vblank
             // The real thing does it line by line as it goes, but this is easier
             if (read_mem8(LCD_CONTROL) & 0b1) {
@@ -535,7 +543,7 @@ void GameBoy::update_screen(void) {
     }
 }
 
-void GameBoy::dump_state(void) const {
+void GameBoy::dump_regs(void) const {
     std::cout << std::setfill('0') << std::uppercase << std::hex << "AF: " << std::setw(4)
               << (int64_t)get_doublereg(REG_A, REG_F) << std::setw(0) << ",  "
               << "BC: " << std::setw(4) << (int64_t)get_doublereg(REG_B, REG_C) << std::setw(0) << ",  "
@@ -557,7 +565,7 @@ void GameBoy::dump_mem(void) const {
     std::stringstream ss;
     ss << std::setfill('0') << std::uppercase << std::hex;
 
-    for (uint32_t i = 0; i < TOTAL_RAM; i++) {
+    for (uint32_t i = 0; i < TOTAL_ADDRESSABLE_BYTES; i++) {
         ss << std::setw(2) << (int64_t)read_mem8(i) << std::setw(0)
            << (i % 16 == 7 ? "  " : (i % 16 == 15 ? "\n" : " "));
         if (i % 16 == 15) {
@@ -573,7 +581,7 @@ void GameBoy::dump_mem(void) const {
             }
         }
     }
-    std::cout << std::hex << TOTAL_RAM << std::dec << std::setw(0) << std::endl;
+    std::cout << std::hex << TOTAL_ADDRESSABLE_BYTES << std::dec << std::setw(0) << std::endl;
 }
 
 void GameBoy::dump_screen(void) const {
@@ -603,6 +611,21 @@ void GameBoy::dump_screen(void) const {
 }
 
 int GameBoy::execute_instruction(uint16_t addr) {
+    std::cout << std::uppercase << std::hex << "A: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_A)
+              << std::setw(0) << " F: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_F)
+              << std::setw(0) << " B: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_B)
+              << std::setw(0) << " C: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_C)
+              << std::setw(0) << " D: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_D)
+              << std::setw(0) << " E: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_E)
+              << std::setw(0) << " H: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_H)
+              << std::setw(0) << " L: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_L)
+              << std::setw(0) << " SP: " << std::setw(4) << std::setfill('0') << (int)get_doublereg(REG_S, REG_P)
+              << std::setw(0) << " PC: 00:" << std::setw(4) << std::setfill('0') << pc << std::setw(0) << " ("
+              << std::setw(2) << std::setfill('0') << (int)read_mem8(pc) << std::setw(0) << " " << std::setw(2)
+              << std::setfill('0') << (int)read_mem8(pc + 1) << std::setw(0) << " " << std::setw(2) << std::setfill('0')
+              << (int)read_mem8(pc + 2) << std::setw(0) << " " << std::setw(2) << std::setfill('0')
+              << (int)read_mem8(pc + 3) << std::setw(0) << ")\n"
+              << std::dec;
     if (halted) {
         return 0;
     }
@@ -784,7 +807,10 @@ int GameBoy::execute_instruction(uint16_t addr) {
         set_doublereg(REG_S, REG_P, get_doublereg(REG_S, REG_P) + 2);
         cycles_to_wait += 3;
         pc += 1;
-        // } else if (instruction == 0b11111000) { // LDHL SP, e
+    } else if (instruction == 0b11111000) {  // LDHL SP, e
+        DEBUG(1, "LDHL SP, e\n");
+        DEBUG(1, "UNIMPLEMENTED INSTRUCTION\n");
+        exit(1);
     } else if (instruction == 0b00001000) {  // LD (nn), SP
         DEBUG(1, "LD (0x" << std::hex << n16 << std::dec << "), SP\n");
         write_mem16(n16, get_doublereg(REG_S, REG_P));
@@ -1088,7 +1114,10 @@ int GameBoy::execute_instruction(uint16_t addr) {
         // For some reason, this doesn't touch the Z flag
         cycles_to_wait += 2;
         pc += 1;
-        // } else if (instruction == 0b11101000) { // ADD SP, e
+    } else if (instruction == 0b11101000) {  // ADD SP, e
+        DEBUG(1, "ADD SP, e\n");
+        DEBUG(1, "UNIMPLEMENTED INSTRUCTION\n");
+        exit(1);
     } else if ((instruction & 0b11001111) == 0b00000011) {  // INC ss
         DEBUG(1, "INC " << stringify_dd_doublereg(doublereg_bits) << "\n");
         set_doublereg(s1, s2, get_doublereg(s1, s2) + 1);

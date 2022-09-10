@@ -40,7 +40,7 @@ void error_out(std::string my_error = "") {
 void sigint_handler(int) {
     global_gb->dump_screen();
     global_gb->dump_mem();
-    global_gb->dump_state();
+    global_gb->dump_regs();
     exit(1);
 }
 
@@ -143,6 +143,7 @@ int main(int argc, char* argv[]) {
     bool debug_paused = args.contains("--freeze");
     args.erase("--freeze");
 
+
     if (args.size() != 1) {
         std::cerr << "Usage: " << argv[0] << " [--headless] [--freeze] <ROM>\n";
         return 1;
@@ -183,7 +184,7 @@ int main(int argc, char* argv[]) {
                             gb.dump_screen();
                             break;
                         case SDLK_r:
-                            gb.dump_state();
+                            gb.dump_regs();
                             break;
                         case SDLK_m:
                             gb.dump_mem();
@@ -255,7 +256,7 @@ int main(int argc, char* argv[]) {
 done:
     // gb.dump_screen();
     // gb.dump_mem();
-    // gb.dump_state();
+    // gb.dump_regs();
 
     deinit(window, renderer, gb_screen);
     error_out("Finished execution.");

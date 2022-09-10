@@ -4,15 +4,15 @@
 #include <fstream>
 
 #define DEBUG_LEVEL 1
-// #define DEBUG(lvl, str)
-#define DEBUG(lvl, str) do { if (lvl <= DEBUG_LEVEL) std::cerr << str; } while (0)
+// #define DEBUG(lvl, stuff)
+#define DEBUG(lvl, stuff) do { if (lvl <= DEBUG_LEVEL) std::cerr << stuff; } while (0)
 #define DEBUGPPU(x)
 // #define DEBUGPPU(x) do { std::cerr << "[PPU] " << x; } while (0)
 
-std::uint64_t const GB_SCREEN_WIDTH = 160;
-std::uint64_t const GB_SCREEN_HEIGHT = 144;
+std::int64_t const GB_SCREEN_WIDTH = 160;
+std::int64_t const GB_SCREEN_HEIGHT = 144;
 std::uint64_t const NUM_REGISTERS = 8;
-std::uint16_t const TOTAL_RAM = 0xFFFF;
+std::uint32_t const TOTAL_ADDRESSABLE_BYTES = 0x10000;
 
 std::uint16_t const IVT_OFFSET = 0x0000;
 std::uint16_t const HEADER_OFFSET = 0x0100;
@@ -60,6 +60,7 @@ std::uint16_t const TIMA = 0xFF05;
 std::uint16_t const TMA = 0xFF06;
 std::uint16_t const TAC = 0xFF07;
 
+std::uint8_t const FIRST_VBLANK_SCANLINE = 144;
 std::uint64_t const BG_MAP_WIDTH = 32; // Tiles
 std::uint64_t const BG_MAP_HEIGHT = 32; // Tiles
 std::uint64_t const TILE_WIDTH = 8; // Pixels
@@ -123,7 +124,7 @@ public: // change to private when done debugging
     std::uint16_t pc = HEADER_OFFSET;
     bool ime = 1;
     JoypadMode joypad_mode = DIRECTIONS; // idk if this is true
-    std::uint8_t ram[TOTAL_RAM] = {0};
+    std::uint8_t ram[TOTAL_ADDRESSABLE_BYTES] = {0};
     std::uint8_t registers[NUM_REGISTERS + 2] = {0}; // The +2 is for SP. We set these in the constructor for readability
 
     std::uint64_t cycles_to_wait = 0;
@@ -167,7 +168,7 @@ public: // change to private when done debugging
     void release_button(JoypadButton);
 
     int execute_instruction(std::uint16_t addr);
-    void dump_state(void) const;
+    void dump_regs(void) const;
     void dump_mem(void) const;
     void dump_screen(void) const;
 };
