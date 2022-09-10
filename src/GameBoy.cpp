@@ -1249,7 +1249,7 @@ int GameBoy::execute_instruction(uint16_t addr) {
         set_flag(FL_C, lost_bit);
         set_flag(FL_H, 0);
         set_flag(FL_N, 0);
-        set_flag(FL_Z, get_register8(r));
+        set_flag(FL_Z, get_register8(r) == 0);
         cycles_to_wait += 2;
         pc += 2;
     } else if (instruction == 0b11011011 && n8 == 0b00011110) {  // RR (HL)

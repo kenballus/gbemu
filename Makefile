@@ -1,37 +1,37 @@
-CPP := clang++
-CPPFLAGS := -Wall -g -march=native -std=c++20
-LINKERFLAGS := -lSDL2
+CXX ?= clang++
+CXXFLAGS ?= -Wall -g -march=native -std=c++20
+LDFLAGS ?= -lSDL2
 
-OBJ_DIR := obj
-_OBJ := GameBoy
-OBJ := $(patsubst %, $(OBJ_DIR)/%, $(_OBJ).o)
+OBJ_DIR ?= obj
+_OBJ ?= GameBoy
+OBJ ?= $(patsubst %, $(OBJ_DIR)/%, $(_OBJ).o)
 
-SRC_DIR := src
-MAIN := $(SRC_DIR)/main.cpp
-BINARY := gbemu
-TEST := test
+SRC_DIR ?= src
 
-all: $(BINARY) $(TEST).gb
+MAIN ?= $(SRC_DIR)/main.cpp
+BINARY ?= gbemu
+TEST_DIR ?= test
+
+all: $(BINARY) $(TEST_DIR)/test.gb
 
 # Compile the target
 $(BINARY): $(OBJ) $(MAIN)
 	clang-format -i -style=file $(MAIN)
-	$(CPP) $(LINKERFLAGS) $(CPPFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $(CXXFLAGS) $^ -o $@
 
 # Compile all the object files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(SRC_DIR)/%.hpp
 	mkdir -p $(OBJ_DIR)
 	clang-format -i -style=file $<
-	$(CPP) $(CPPFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
 	rm -f $(OBJ_DIR)/*.o $(BINARY)
-	rm -f $(TEST)/$(TEST).o
-	rm -f $(TEST).gb
+	rm -f $(TEST_DIR)/test.gb
 
-$(OBJ_DIR)/$(TEST).o: $(TEST)/$(TEST).asm
-	rgbasm -L -o $(OBJ_DIR)/$(TEST).o $(TEST)/$(TEST).asm
+$(OBJ_DIR)/test.o: $(TEST_DIR)/test.asm
+	rgbasm -L -o $(OBJ_DIR)/test.o $(TEST_DIR)/test.asm
 
-$(TEST).gb: $(OBJ_DIR)/$(TEST).o
-	rgblink -o $(TEST).gb $(OBJ_DIR)/$(TEST).o
+$(TEST_DIR)/test.gb: $(OBJ_DIR)/test.o
+	rgblink -o $(TEST_DIR)/test.gb $(OBJ_DIR)/test.o
