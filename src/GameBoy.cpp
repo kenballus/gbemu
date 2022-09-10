@@ -116,7 +116,7 @@ bool is_writable(uint16_t addr) {
 
 bool detect_carry(uint32_t a, uint32_t b, uint8_t bit) {
     // True if a + b carries from bit
-    uint8_t mask = (1 << (bit + 1)) - 1;
+    uint32_t mask = (1 << (bit + 1)) - 1;
     a &= mask;
     b &= mask;
 
