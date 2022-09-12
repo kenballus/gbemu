@@ -2,10 +2,11 @@
 
 #include <cstdint>
 #include <fstream>
+#include <utility>
 
 #define DEBUG_LEVEL 1
 // #define DEBUG(lvl, stuff)
-#define DEBUG(lvl, stuff) do { if (lvl <= DEBUG_LEVEL) std::cerr << stuff; } while (0)
+#define DEBUG(lvl, stuff) do { if (lvl <= DEBUG_LEVEL) std::cerr << stuff << std::endl; } while (0)
 #define DEBUGPPU(x)
 // #define DEBUGPPU(x) do { std::cerr << "[PPU] " << x; } while (0)
 
@@ -64,6 +65,7 @@ std::uint8_t const FIRST_VBLANK_SCANLINE = 144;
 std::uint64_t const BG_MAP_WIDTH = 32; // Tiles
 std::uint64_t const BG_MAP_HEIGHT = 32; // Tiles
 std::uint64_t const TILE_WIDTH = 8; // Pixels
+std::uint64_t const TILE_HEIGHT = 8; // Pixels
 std::uint64_t const BYTES_PER_TILE = 0x10;
 std::uint64_t const BG_MAP_SIZE = 0x400;
 // The true clock speed is 4x this, but every instruction takes a multiple of 4 cycles so we're dividing everything by 4
@@ -108,8 +110,9 @@ enum Flag {
 };
 
 enum JoypadMode {
-    DIRECTIONS = 0,
-    ACTIONS = 1,
+    DIRECTIONS = 0b01,
+    ACTIONS = 0b10,
+    BOTH = 0b11,
 };
 
 enum GraphicsMode {
@@ -135,40 +138,45 @@ public: // change to private when done debugging
 
     bool keys_pressed[8];
 
+    bool need_to_do_interrupts = false;
     bool halted = false;
 
-    std::uint8_t screen[GB_SCREEN_HEIGHT][GB_SCREEN_WIDTH]; // We render everything to here.
+    std::uint8_t screen[BG_MAP_HEIGHT * TILE_HEIGHT][BG_MAP_WIDTH * TILE_WIDTH]; // We render everything to here.
 
     GameBoy(void);
-    void zero_screen(void);
     void load_rom(std::string romfile);
     void wait(void);
     void handle_interrupts(void);
 
     std::uint8_t read_joypad(void) const;
-    std::uint8_t read_mem8(std::uint16_t addr) const;
-    std::uint16_t read_mem16(std::uint16_t addr) const;
-    void write_mem8(std::uint16_t addr, std::uint8_t val);
-    void write_mem16(std::uint16_t addr, std::uint16_t val);
-    void set_register8(Register8 const r8, std::uint8_t const u8);
-    std::uint8_t get_register8(Register8 r8) const;
-    void set_doublereg(Register8 r8_1, Register8 r8_2, std::uint16_t val);
-    std::uint16_t get_doublereg(Register8 r8_1, Register8 r8_2) const;
-    void set_flag(Flag flag, bool val);
-    bool get_flag(Flag flag) const;
-    void do_dma(std::uint8_t const start_address);
+    std::uint8_t read_mem8(std::uint16_t) const;
+    std::uint16_t read_mem16(std::uint16_t) const;
+    void write_mem8(std::uint16_t, std::uint8_t);
+    void write_mem16(std::uint16_t, std::uint16_t);
+    void set_register8(Register8 const, std::uint8_t const);
+    std::uint8_t get_register8(Register8) const;
+    void set_doublereg(Register8, Register8, std::uint16_t);
+    std::uint16_t get_doublereg(Register8, Register8) const;
+    void set_flag(Flag, bool);
+    bool get_flag(Flag) const;
+    void do_dma(std::uint8_t const);
     void enter_vblank(void);
     void enter_hblank(void);
     void enter_searching(void);
     void enter_transferring(void);
     void update_screen(void);
     void render_background(void);
-    void write_bg_tile_to_screen(std::uint8_t, std::uint8_t, std::uint16_t);
+    void write_bg_tile_to_screen(std::int16_t, std::int16_t, std::uint16_t);
     void press_button(JoypadButton);
     void release_button(JoypadButton);
+    std::pair<std::int16_t, std::int16_t> get_screen_origin(void) const;
+    void call(std::uint16_t);
+    void pop(Register8, Register8);
+    void push(std::uint16_t);
 
-    int execute_instruction(std::uint16_t addr);
+    int execute_instruction(std::uint16_t);
     void dump_regs(void) const;
     void dump_mem(void) const;
     void dump_screen(void) const;
+    void dump_vram(void) const;
 };

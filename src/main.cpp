@@ -101,9 +101,11 @@ void update_gb_screen(GameBoy const& gb, SDL_Texture* gb_screen, SDL_Renderer* r
     int unused = 0;
     SDL_LockTexture(gb_screen, NULL, &raw_pixels, &unused);
     pixel_t* pixels = (pixel_t*)raw_pixels;
+    auto [origin_r, origin_c] = gb.get_screen_origin();
     for (size_t r = 0; r < GB_SCREEN_HEIGHT; r++) {
         for (size_t c = 0; c < GB_SCREEN_WIDTH; c++) {
-            uint8_t color_bits = gb.screen[r][c];
+            uint8_t color_bits = gb.screen[(origin_r + r) % (BG_MAP_WIDTH * TILE_WIDTH)]
+                                          [(origin_c + c) % (BG_MAP_HEIGHT * TILE_HEIGHT)];
             pixel_t pixel_color;
             switch (color_bits) {
                 case 0b00:
@@ -130,9 +132,6 @@ void update_gb_screen(GameBoy const& gb, SDL_Texture* gb_screen, SDL_Renderer* r
 }
 
 int main(int argc, char* argv[]) {
-    auto gb = GameBoy();
-    global_gb = &gb;
-
     std::unordered_set<std::string> args;
     for (int i = 1; i < argc; i++) {
         args.insert(argv[i]);
@@ -143,11 +142,14 @@ int main(int argc, char* argv[]) {
     bool debug_paused = args.contains("--freeze");
     args.erase("--freeze");
 
-
     if (args.size() != 1) {
         std::cerr << "Usage: " << argv[0] << " [--headless] [--freeze] <ROM>\n";
         return 1;
     }
+
+    auto gb = GameBoy();
+    global_gb = &gb;
+
     gb.load_rom(*args.cbegin());
 
     SDL_Window* window = NULL;
@@ -188,6 +190,9 @@ int main(int argc, char* argv[]) {
                             break;
                         case SDLK_m:
                             gb.dump_mem();
+                            break;
+                        case SDLK_v:
+                            gb.dump_vram();
                             break;
                         case KEY_MAPPED_TO_A:
                             gb.press_button(GB_KEY_A);
