@@ -104,8 +104,8 @@ void update_gb_screen(GameBoy const& gb, SDL_Texture* gb_screen, SDL_Renderer* r
     auto [origin_r, origin_c] = gb.get_screen_origin();
     for (size_t r = 0; r < GB_SCREEN_HEIGHT; r++) {
         for (size_t c = 0; c < GB_SCREEN_WIDTH; c++) {
-            uint8_t color_bits = gb.screen[(origin_r + r) % (BG_MAP_WIDTH * TILE_WIDTH)]
-                                          [(origin_c + c) % (BG_MAP_HEIGHT * TILE_HEIGHT)];
+            uint8_t color_bits = gb.screen[(origin_r + r) % (TILE_MAP_WIDTH * TILE_WIDTH)]
+                                          [(origin_c + c) % (TILE_MAP_HEIGHT * TILE_HEIGHT)];
             pixel_t pixel_color;
             switch (color_bits) {
                 case 0b00:
@@ -193,6 +193,9 @@ int main(int argc, char* argv[]) {
                             break;
                         case SDLK_v:
                             gb.dump_vram();
+                            break;
+                        case SDLK_e:
+                            std::cout << "IME = " << gb.ime << std::endl;
                             break;
                         case KEY_MAPPED_TO_A:
                             gb.press_button(GB_KEY_A);
