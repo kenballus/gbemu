@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -113,8 +114,8 @@ bool is_writable(uint16_t addr) {
     if (0xFE00 <= addr && addr <= 0xFEFF) {  // This is a hack. OAM should not be writable (or readable) at all times.
         return true;
     }
-    return (addr >= UNSIGNED_TILE_DATA_BASE) && (addr < ECHO_RAM || addr >= OAM) &&
-           (addr < UNUSED_ADDRESSES || addr >= IO_REGS);
+    return (UNSIGNED_TILE_DATA_BASE <= addr && addr < ECHO_RAM) || (OAM <= addr && addr < UNUSED_ADDRESSES) ||
+           (IO_REGS <= addr && addr < INTERRUPT_ENABLE);
 }
 
 bool detect_carry(uint32_t a, uint32_t b, uint8_t bit) {
@@ -136,12 +137,16 @@ bool detect_borrow(uint32_t a, uint32_t b, uint8_t bit) {
 
 GameBoy::GameBoy(void) {
     DEBUG(1, "Bringin' her up!");
+
+    // for (uint64_t i = 0; i < TOTAL_ADDRESSABLE_BYTES; i++) {
+    //     ram[i] = std::rand() % 256;
+    // }
+
     set_doublereg(REG_A, REG_F, 0x01B0);
     set_doublereg(REG_B, REG_C, 0x0013);
     set_doublereg(REG_D, REG_E, 0x00D8);
     set_doublereg(REG_H, REG_L, 0x014D);
     set_doublereg(REG_S, REG_P, 0xFFFE);
-    ram[JOYPAD_PORT] = 0xCF;
     write_mem8(DIVIDER_REGISTER, 0x18);
     write_mem8(TIMA, 0x00);
     write_mem8(TMA, 0x00);
@@ -191,7 +196,7 @@ GameBoy::GameBoy(void) {
 
 std::pair<int16_t, int16_t> GameBoy::get_screen_origin(void) const { return std::pair(read_mem8(SCY), read_mem8(SCX)); }
 
-void GameBoy::load_rom(std::string romfile) {
+void GameBoy::load_rom(std::string const& romfile) {
     std::streampos size;
 
     std::ifstream ifs(romfile, std::ios::in | std::ios::binary | std::ios::ate);
@@ -246,24 +251,24 @@ void GameBoy::wait(void) {
 
 void GameBoy::press_button(JoypadButton btn) {
     // This is the opposite of what you'd think.
-    keys_pressed[btn] = false;
+    buttons_pressed[btn] = false;
     write_mem8(INTERRUPT_FLAGS, read_mem8(INTERRUPT_FLAGS) | 0b10000);  // Request a joypad interrupt
 }
 
 void GameBoy::release_button(JoypadButton btn) {
     // This is the opposite of what you'd think.
-    keys_pressed[btn] = true;
+    buttons_pressed[btn] = true;
 }
 
 uint8_t GameBoy::read_joypad(void) const {
-    uint8_t retval = 0;
+    uint8_t retval = (0b11 << 6) | (joypad_mode << 4);
     if (joypad_mode & DIRECTIONS) {
-        retval |= (0b0001 << 4) | (keys_pressed[GB_KEY_DOWN] << 3) | (keys_pressed[GB_KEY_UP] << 2) |
-                  (keys_pressed[GB_KEY_LEFT] << 1) | (keys_pressed[GB_KEY_RIGHT] << 0);
+        retval |= (buttons_pressed[GB_KEY_DOWN] << 3) | (buttons_pressed[GB_KEY_UP] << 2) |
+                  (buttons_pressed[GB_KEY_LEFT] << 1) | (buttons_pressed[GB_KEY_RIGHT] << 0);
     }
     if (joypad_mode & ACTIONS) {
-        retval |= (0b0010 << 4) | (keys_pressed[GB_KEY_START] << 3) | (keys_pressed[GB_KEY_SELECT] << 2) |
-                  (keys_pressed[GB_KEY_B] << 1) | (keys_pressed[GB_KEY_A] << 0);
+        retval |= (buttons_pressed[GB_KEY_START] << 3) | (buttons_pressed[GB_KEY_SELECT] << 2) |
+                  (buttons_pressed[GB_KEY_B] << 1) | (buttons_pressed[GB_KEY_A] << 0);
     }
 
     return retval;
@@ -370,13 +375,13 @@ void GameBoy::write_mem8(uint16_t addr, uint8_t val) {
         // std::cout << (char)val;
     } else if (is_writable(addr)) {
         ram[addr] = val;
-    } else if (ROM_BANK_1 <= addr && addr < UNSIGNED_TILE_DATA_BASE) {
+    } else if (HEADER_OFFSET <= addr && addr < UNSIGNED_TILE_DATA_BASE) {
         std::cerr << "Attempted bank switch, which is not implemented.\n";
         // exit(1);
     } else {
         std::cerr << "Attempted potentially illegal write of 0x" << std::hex << (int64_t)val << " to address 0x"
                   << (int64_t)addr << std::dec << "\n";
-        // exit(1);
+        exit(1);
     }
 }
 
@@ -411,6 +416,7 @@ void GameBoy::set_flag(Flag flag, bool val) {
 bool GameBoy::get_flag(Flag flag) const { return get_register8(REG_F) & flag; }
 
 void GameBoy::do_dma(uint8_t const start_address) {
+    cycles_to_wait += 160;
     uint16_t const real_start_address = start_address << 8;
     for (uint16_t i = 0; i < 0xFF; i++) {
         write_mem8(OAM + i, read_mem8(real_start_address + i));
@@ -489,14 +495,15 @@ void GameBoy::render_tile(int16_t const start_y, int16_t const start_x, uint16_t
     }
 }
 
-void GameBoy::render_tilemap(bool addressing_mode, uint16_t tile_map, uint16_t palette_address) {
+void GameBoy::render_tilemap(bool const addressing_mode, uint16_t const tile_map, uint16_t const palette_address,
+                             uint8_t const origin_y, uint8_t const origin_x) {
     for (uint16_t i = 0; i < TILE_MAP_SIZE; i++) {
         if (addressing_mode) {  // unsigned, 0x8000-based
-            render_tile((i / TILE_MAP_WIDTH) * TILE_HEIGHT, (i % TILE_MAP_WIDTH) * TILE_WIDTH,
+            render_tile(origin_y + (i / TILE_MAP_WIDTH) * TILE_HEIGHT, origin_x + (i % TILE_MAP_WIDTH) * TILE_WIDTH,
                         UNSIGNED_TILE_DATA_BASE + read_mem8(tile_map + i) * BYTES_PER_TILE, palette_address,
                         /*is_sprite_tile=*/false);
         } else {  // signed, 0x9000-based
-            render_tile((i / TILE_MAP_WIDTH) * TILE_HEIGHT, (i % TILE_MAP_WIDTH) * TILE_WIDTH,
+            render_tile(origin_y + (i / TILE_MAP_WIDTH) * TILE_HEIGHT, origin_x + (i % TILE_MAP_WIDTH) * TILE_WIDTH,
                         SIGNED_TILE_DATA_BASE + (int8_t)read_mem8(tile_map + i) * BYTES_PER_TILE, palette_address,
                         /*is_sprite_tile=*/false);
         }
@@ -506,13 +513,13 @@ void GameBoy::render_tilemap(bool addressing_mode, uint16_t tile_map, uint16_t p
 void GameBoy::render_background(void) {
     bool const addressing_mode = bit(read_mem8(LCD_CONTROL), 4);
     uint16_t const bg_map_data = bit(read_mem8(LCD_CONTROL), 3) ? TILE_MAP_2 : TILE_MAP_1;
-    render_tilemap(addressing_mode, bg_map_data, BGP);
+    render_tilemap(addressing_mode, bg_map_data, BGP, 0, 0);
 }
 
 void GameBoy::render_window(void) {
     bool const addressing_mode = bit(read_mem8(LCD_CONTROL), 4);
     uint16_t const win_map_data = bit(read_mem8(LCD_CONTROL), 6) ? TILE_MAP_2 : TILE_MAP_1;
-    render_tilemap(addressing_mode, win_map_data, BGP);
+    render_tilemap(addressing_mode, win_map_data, BGP, read_mem8(WY), read_mem8(WX) - 7);
 }
 
 void GameBoy::render_sprite(uint16_t const sprite_address) {
@@ -521,8 +528,8 @@ void GameBoy::render_sprite(uint16_t const sprite_address) {
     uint16_t const tile_address = UNSIGNED_TILE_DATA_BASE + read_mem8(sprite_address + 2);
     uint8_t const attrs = read_mem8(sprite_address + 3);
     uint16_t const palette_address = bit(attrs, 4) ? OBP1 : OBP0;
-    bool const x_flip = bit(attrs, 5);  // Unimplemented
-    bool const y_flip = bit(attrs, 6);  // Unimplemented
+    bool const x_flip = bit(attrs, 5);
+    bool const y_flip = bit(attrs, 6);
     // bool const bg_and_window_over_obj = bit(attrs, 7); // Unimplemented
 
     render_tile(y, x, tile_address, palette_address, /*is_sprite_tile=*/true, y_flip, x_flip);
@@ -535,6 +542,7 @@ void GameBoy::render_sprites(void) {
         if (sprite_size) {
             render_sprite(sprite_base_address - sprite_base_address % 2);
             render_sprite(sprite_base_address - sprite_base_address % 2 + 1);
+            i++;  // Skip the next sprite because it's just part of this sprite.
         } else {
             render_sprite(sprite_base_address);
         }
@@ -543,7 +551,7 @@ void GameBoy::render_sprites(void) {
 
 void GameBoy::update_screen(void) {
     DEBUGPPU("Doing 16 dots.\n");
-    // Called once per CPU cycle, if the LCD is enabled.
+    // Called once per M-cycle, if the LCD is enabled.
 
     dot_count += 16;     // Dot clock = 4 * real clock = 4 * 4 * our clock
     dot_count %= 70224;  // It takes 70224 dots to do one frame
@@ -596,18 +604,18 @@ void GameBoy::update_screen(void) {
 }
 
 void GameBoy::dump_regs(void) const {
-    std::cout << std::setfill('0') << std::uppercase << std::hex << "AF: " << std::setw(4)
-              << (int64_t)get_doublereg(REG_A, REG_F) << std::setw(0) << ",  "
-              << "BC: " << std::setw(4) << (int64_t)get_doublereg(REG_B, REG_C) << std::setw(0) << ",  "
-              << "DE: " << std::setw(4) << (int64_t)get_doublereg(REG_D, REG_E) << std::setw(0) << ",  "
-              << "HL: " << std::setw(4) << (int64_t)get_doublereg(REG_H, REG_L) << std::setw(0) << ",  "
-              << "SP: " << std::setw(4) << (int64_t)get_doublereg(REG_S, REG_P) << std::setw(0) << ",  "
-              << "PC: " << std::setw(4) << pc << std::setw(0) << "  \n"
-              << "Z:  " << get_flag(FL_Z) << ",     "
-              << "N:  " << get_flag(FL_N) << ",     "
-              << "H:  " << get_flag(FL_H) << ",     "
-              << "C:  " << get_flag(FL_C) << "\n"
-              << std::dec;
+    // std::cout << std::setfill('0') << std::uppercase << std::hex << "AF: " << std::setw(4)
+    //           << (int64_t)get_doublereg(REG_A, REG_F) << std::setw(0) << ",  "
+    //           << "BC: " << std::setw(4) << (int64_t)get_doublereg(REG_B, REG_C) << std::setw(0) << ",  "
+    //           << "DE: " << std::setw(4) << (int64_t)get_doublereg(REG_D, REG_E) << std::setw(0) << ",  "
+    //           << "HL: " << std::setw(4) << (int64_t)get_doublereg(REG_H, REG_L) << std::setw(0) << ",  "
+    //           << "SP: " << std::setw(4) << (int64_t)get_doublereg(REG_S, REG_P) << std::setw(0) << ",  "
+    //           << "PC: " << std::setw(4) << pc << std::setw(0) << "  \n"
+    //           << "Z:  " << get_flag(FL_Z) << ",     "
+    //           << "N:  " << get_flag(FL_N) << ",     "
+    //           << "H:  " << get_flag(FL_H) << ",     "
+    //           << "C:  " << get_flag(FL_C) << "\n"
+    //           << std::dec;
 }
 
 void GameBoy::dump_mem(void) const {
@@ -660,8 +668,13 @@ void GameBoy::dump_vram(void) const {
     }
 }
 
-int GameBoy::execute_instruction(uint16_t addr) {
-    // if (addr >= HEADER_OFFSET) {
+void GameBoy::execute_instruction(void) {
+    if (need_to_do_interrupts) {
+        handle_interrupts();
+        need_to_do_interrupts = false;
+    }
+
+    // if (pc >= HEADER_OFFSET) {
     std::cout << std::uppercase << std::hex << "A: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_A)
               << std::setw(0) << " F: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_F)
               << std::setw(0) << " B: " << std::setw(2) << std::setfill('0') << (int)get_register8(REG_B)
@@ -683,14 +696,10 @@ int GameBoy::execute_instruction(uint16_t addr) {
         if (cycles_to_wait == 0) {
             cycles_to_wait += 1;
         }
-        if (need_to_do_interrupts) {
-            handle_interrupts();
-            need_to_do_interrupts = false;
-        }
-        return 0;
+        return;
     }
 
-    uint8_t const instruction = read_mem8(addr);
+    uint8_t const instruction = read_mem8(pc);
     uint8_t const top_two = instruction >> 6;
 
     Register8 const r8_1 = (Register8)(instruction >> 3 & 0b111);
@@ -732,15 +741,10 @@ int GameBoy::execute_instruction(uint16_t addr) {
     Register8 const s1 = d1;  // This is just to go with the naming convention in the docs
     Register8 const s2 = d2;
 
-    uint8_t const n8 = read_mem8(addr + 1);
+    uint8_t const n8 = read_mem8(pc + 1);
     int8_t const e8 = n8;
     uint8_t cc = (instruction >> 3) & 0b11;
-    uint16_t const n16 = read_mem16(addr + 1);
-
-    DEBUG(1, "0x" << std::hex << (int64_t)pc << ": ");
-    // << "Executing instruction 0x" << std::setfill('0') << std::setw(2) << (int64_t)instruction << std::setw(0)
-    // << " " << std::dec << "(0b" << std::bitset<8>{instruction} << ")"
-    // << ": ");
+    uint16_t const n16 = read_mem16(pc + 1);
 
     if (top_two == 0b01 && r8_1 != DUMMY && r8_2 != DUMMY) {  // LD r, r'
         DEBUG(1, "LD " << stringify_reg(r8_1) << ", " << stringify_reg(r8_2) << " ");
@@ -1675,12 +1679,11 @@ int GameBoy::execute_instruction(uint16_t addr) {
         handle_interrupts();
         need_to_do_interrupts = false;
     }
-
-    return 0;
 }
 
 /* TO DO:
     MBCs
     fix sprites
+    fix joypad
     Fix interrupts
 */

@@ -4,7 +4,7 @@
 #include <fstream>
 #include <utility>
 
-#define DEBUG_LEVEL 0
+#define DEBUG_LEVEL 1
 // #define DEBUG(lvl, stuff)
 #define DEBUG(lvl, stuff) do { if (lvl <= DEBUG_LEVEL) std::cerr << stuff << std::endl; } while (0)
 #define DEBUGPPU(x)
@@ -72,7 +72,7 @@ uint64_t const BYTES_PER_TILE = 0x10;
 uint64_t const TILE_MAP_SIZE = 0x400; // Bytes
 uint64_t const DIVIDER_REGISTER_RATE = 16384;
 std::uint64_t const CLOCK_SPEED = 1048576; // M-cycles
-// So we do (our) clock 64 times for each increment of the divider:
+// So we do 64 M-cycles for each increment of the divider:
 uint64_t const CLOCKS_PER_DIVIDER_INCREMENT = 64;
 uint64_t const NUM_SPRITES = 40;
 
@@ -128,17 +128,17 @@ class GameBoy {
 public: // change to private when done debugging
     uint16_t pc = HEADER_OFFSET;
     bool ime = 1;
-    JoypadMode joypad_mode = DIRECTIONS; // idk if this is true
-    uint8_t ram[TOTAL_ADDRESSABLE_BYTES] = {0};
+    JoypadMode joypad_mode = BOTH; // idk if this is true
+    uint8_t ram[TOTAL_ADDRESSABLE_BYTES];
     uint8_t registers[NUM_REGISTERS + 2] = {0}; // The +2 is for SP. We set these in the constructor for readability
 
-    uint64_t cycles_to_wait = 0;
+    uint64_t cycles_to_wait = 0; // M-cycles
     uint64_t cycle_count = 0;
 
     uint32_t dot_count = 0;
     GraphicsMode graphics_mode = SEARCHING;
 
-    bool keys_pressed[8];
+    bool buttons_pressed[8] = {true};
 
     bool need_to_do_interrupts = true;
     bool halted = false;
@@ -146,7 +146,7 @@ public: // change to private when done debugging
     uint8_t screen[TILE_MAP_HEIGHT * TILE_HEIGHT][TILE_MAP_WIDTH * TILE_WIDTH]; // We render everything to here.
 
     GameBoy(void);
-    void load_rom(std::string);
+    void load_rom(std::string const &romfile);
     void wait(void);
     void handle_interrupts(void);
 
@@ -178,9 +178,9 @@ public: // change to private when done debugging
     void call(uint16_t);
     void pop(Register8, Register8);
     void push(uint16_t);
-    void render_tilemap(bool, uint16_t, uint16_t);
+    void render_tilemap(bool const addressing_mode, uint16_t const tile_map, uint16_t const palette_address, uint8_t const origin_y, uint8_t const origin_x);
 
-    int execute_instruction(uint16_t);
+    void execute_instruction(void);
     void dump_regs(void) const;
     void dump_mem(void) const;
     void dump_screen(void) const;

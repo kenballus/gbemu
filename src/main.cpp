@@ -254,7 +254,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (stepping || !debug_paused) {
-            gb.execute_instruction(gb.pc);
+            gb.execute_instruction();
             gb.wait();
             stepping = false;
         }
