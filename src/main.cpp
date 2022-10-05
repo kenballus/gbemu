@@ -9,8 +9,8 @@
 
 #include "GameBoy.hpp"
 
-#define SCREEN_WIDTH 1280
-#define SCREEN_HEIGHT 640
+#define SCREEN_WIDTH 960
+#define SCREEN_HEIGHT 864
 
 #define KEY_MAPPED_TO_A SDLK_a
 #define KEY_MAPPED_TO_B SDLK_b

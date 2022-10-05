@@ -169,9 +169,11 @@ public: // change to private when done debugging
     void update_screen(void);
     void render_background(void);
     void render_window(void);
-    void render_sprite(uint16_t sprite_address);
+    void render_8x8_sprite(uint16_t const sprite_address);
+    void render_8x16_sprite(uint16_t const sprite_address);
+
     void render_sprites(void);
-    void render_tile(int16_t const r, int16_t const c, uint16_t const tile_address, uint16_t const palette_address, bool const is_sprite_tile, bool const y_flip=false, bool const x_flip=false);
+    void render_tile(int16_t const r, int16_t const c, uint16_t const tile_address, uint16_t const palette_address, bool const is_sprite_tile, bool const y_flip=false, bool const x_flip=false, bool const bg_and_window_over_obj=false);
     void press_button(JoypadButton);
     void release_button(JoypadButton);
     std::pair<int16_t, int16_t> get_screen_origin(void) const;

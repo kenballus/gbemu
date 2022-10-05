@@ -471,7 +471,7 @@ void GameBoy::enter_transferring(void) {
 
 void GameBoy::render_tile(int16_t const start_y, int16_t const start_x, uint16_t const tile_address,
                           uint16_t const palette_address, bool const is_sprite_tile, bool const y_flip,
-                          bool const x_flip) {
+                          bool const x_flip, bool const bg_and_window_over_obj) {
     for (uint8_t i = 0; i < 8; i++) {               // For each row in the tile,
         uint8_t const curr_y = y_flip ? 7 - i : i;  // flip around if necessary
         // Read a row from the tile
@@ -486,9 +486,10 @@ void GameBoy::render_tile(int16_t const start_y, int16_t const start_x, uint16_t
             uint16_t const screen_x = start_x + curr_x;
 
             uint8_t const palette_index = ((tile_data >> (14 - curr_x)) & 0b10) | bit(tile_data, 7 - curr_x);
+            uint8_t const color = (read_mem8(palette_address) >> (2 * palette_index)) & 0b11;
             if (screen_y < TILE_MAP_HEIGHT * TILE_HEIGHT && screen_x < TILE_MAP_WIDTH * TILE_WIDTH &&
-                (palette_index != 0b00 || !is_sprite_tile)) {
-                uint8_t const color = (read_mem8(palette_address) >> (2 * palette_index)) & 0b11;
+                !(is_sprite_tile && color == 0b00) &&
+                !(is_sprite_tile && bg_and_window_over_obj && screen[screen_y][screen_x] > 0b00)) {
                 screen[screen_y][screen_x] = color;
             }
         }
@@ -522,7 +523,7 @@ void GameBoy::render_window(void) {
     render_tilemap(addressing_mode, win_map_data, BGP, read_mem8(WY), read_mem8(WX) - 7);
 }
 
-void GameBoy::render_sprite(uint16_t const sprite_address) {
+void GameBoy::render_8x8_sprite(uint16_t const sprite_address) {
     uint8_t const y = read_mem8(sprite_address) - 16;
     uint8_t const x = read_mem8(sprite_address + 1) - 8;
     uint16_t const tile_address = UNSIGNED_TILE_DATA_BASE + read_mem8(sprite_address + 2);
@@ -535,16 +536,32 @@ void GameBoy::render_sprite(uint16_t const sprite_address) {
     render_tile(y, x, tile_address, palette_address, /*is_sprite_tile=*/true, y_flip, x_flip);
 }
 
+void GameBoy::render_8x16_sprite(uint16_t const sprite_address) {
+    uint16_t const sprite_1_address = sprite_address & 0b0;
+    // uint16_t const sprite_2_address = sprite_address | 0b1;
+    uint8_t const y = read_mem8(sprite_1_address) - 16;
+    uint8_t const x = read_mem8(sprite_1_address + 1) - 8;
+    uint16_t const tile_address = UNSIGNED_TILE_DATA_BASE + read_mem8(sprite_1_address + 2);
+    uint8_t const attrs = read_mem8(sprite_1_address + 3);
+    uint16_t const palette_address = bit(attrs, 4) ? OBP1 : OBP0;
+    bool const x_flip = bit(attrs, 5);
+    bool const y_flip = bit(attrs, 6);
+    bool const bg_and_window_over_obj = bit(attrs, 7);  // Unimplemented
+
+    render_tile(y, x, tile_address, palette_address, /*is_sprite_tile=*/true, y_flip, x_flip, bg_and_window_over_obj);
+    render_tile(y + 1, x, tile_address + 1, palette_address, /*is_sprite_tile=*/true, y_flip, x_flip,
+                bg_and_window_over_obj);
+}
+
 void GameBoy::render_sprites(void) {
     for (uint16_t i = 0; i < NUM_SPRITES; i++) {                  // for each of the 40 sprites,
         bool const sprite_size = bit(read_mem8(LCD_CONTROL), 2);  // 0 = 8x8, 1 = 8x16
         uint16_t const sprite_base_address = OAM + 4 * i;
         if (sprite_size) {
-            render_sprite(sprite_base_address - sprite_base_address % 2);
-            render_sprite(sprite_base_address - sprite_base_address % 2 + 1);
+            render_8x16_sprite(sprite_base_address);
             i++;  // Skip the next sprite because it's just part of this sprite.
         } else {
-            render_sprite(sprite_base_address);
+            render_8x8_sprite(sprite_base_address);
         }
     }
 }

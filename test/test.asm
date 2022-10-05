@@ -1,6 +1,32 @@
-SECTION "Header", ROM0[$100]
+SECTION "vblank_ivector", ROM0[$0040]
+	inc a
+	reti
+	ds $0048 - @, 0
+
+SECTION "stat_ivector", ROM0[$0048]
+	inc b
+	reti
+	ds $0050 - @, 0
+
+SECTION "timer_ivector", ROM0[$0050]
+	inc c
+	reti
+	ds $0058 - @, 0
+
+SECTION "serial_ivector", ROM0[$0058]
+	inc d
+	reti
+	ds $0060 - @, 0
+
+SECTION "joypad_ivector", ROM0[$0060]
+	inc e
+	reti
+	ds $0100 - @, 0
+
+SECTION "Header", ROM0[$0100]
 	jp start
-	ds $150 - @, 0 ; Make room for the header
+	reti
+	ds $0150 - @, 0 ; Make room for the header
 
 start:
 	; Write a 0 into LCDC.7, so we have full access to VRAM and OAM
@@ -10,43 +36,68 @@ start:
 	and a, b
 	ld [hl], a
 
-	; Write a 1 into the first place in the tilemap
 	ld hl, $9800
-	ld [hl], 1
+	ld a, $0
+	ld de, $0002
+	ld c, $0
+tile_map_write_top:
+	ld [hl], a
+	add hl, de
+	inc c
+	jr nz, tile_map_write_top
 
-	; Put a tile into character ram
-	ld hl, $8010
-	ld [hl], $00
+write_tile:
+	; Load a smiley tile into vram
+	ld hl, $8000
+
+	ld a, $00
+	ld [hl], a
 	inc hl
-	ld [hl], $01
+	ld a, $00
+	ld [hl], a
 	inc hl
-	ld [hl], $02
+	ld a, $24
+	ld [hl], a
 	inc hl
-	ld [hl], $03
+	ld a, $24
+	ld [hl], a
 	inc hl
-	ld [hl], $04
+	ld a, $24
+	ld [hl], a
 	inc hl
-	ld [hl], $05
+	ld a, $24
+	ld [hl], a
 	inc hl
-	ld [hl], $06
+	ld a, $00
+	ld [hl], a
 	inc hl
-	ld [hl], $07
+	ld a, $00
+	ld [hl], a
 	inc hl
-	ld [hl], $08
+	ld a, $42
+	ld [hl], a
 	inc hl
-	ld [hl], $09
+	ld a, $42
+	ld [hl], a
 	inc hl
-	ld [hl], $0a
+	ld a, $3C
+	ld [hl], a
 	inc hl
-	ld [hl], $0b
+	ld a, $3C
+	ld [hl], a
 	inc hl
-	ld [hl], $0c
+	ld a, $00
+	ld [hl], a
 	inc hl
-	ld [hl], $0d
+	ld a, $08
+	ld [hl], a
 	inc hl
-	ld [hl], $0e
+	ld a, $00
+	ld [hl], a
 	inc hl
-	ld [hl], $0f
+	ld a, $00
+	ld [hl], a
+	inc hl
 
 	; Write a 1 into LCDC.7, so everything will draw
 	ld hl, $FF40
@@ -55,23 +106,23 @@ start:
 	or a, b
 	ld [hl], a
 
-	ld hl, $FF43 ; SCX
-loop_top:
-	ld a, $10 ; Time to spin
-loop:
-	dec a
-	jr NZ, loop
-
+	; enable the timer (TAC.2)
+	ld hl, $FF07
 	ld a, [hl]
-	and a
-	jr NZ, zero_it
+	or a, $4
+	ld [hl], a
 
-	ld a, $4
-	ld [hld], a
-	ld [hli], a
-	jp loop_top
-zero_it:
-	ld a, $0
-	ld [hld], a
-	ld [hli], a
-	jp loop_top
+	; enable the timer interrupt (IE.2)
+	; and disable all others
+	ld hl, $FFFF
+	ld[hl], $4
+
+	; enable interrupts
+	ei
+
+spin:
+	; ld hl, $FF42 ; SCY
+	; inc [hl]
+	; ld hl, $FF43 ; SCX
+	; inc [hl]
+	jp spin
